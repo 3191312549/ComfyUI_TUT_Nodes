@@ -1,0 +1,91 @@
+"""Explicit node registry with duplicate protection."""
+
+from .nodes.image.text import NODE_CLASS_MAPPINGS as IMAGE_TEXT_CLASSES
+from .nodes.image.text import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_TEXT_DISPLAY_NAMES
+from .nodes.image.animation import NODE_CLASS_MAPPINGS as IMAGE_ANIMATION_CLASSES
+from .nodes.image.animation import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_ANIMATION_DISPLAY_NAMES
+from .nodes.image.text_advanced import NODE_CLASS_MAPPINGS as IMAGE_TEXT_ADVANCED_CLASSES
+from .nodes.image.text_advanced import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_TEXT_ADVANCED_DISPLAY_NAMES
+from .nodes.image.text_animation import NODE_CLASS_MAPPINGS as IMAGE_TEXT_ANIMATION_CLASSES
+from .nodes.image.text_animation import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_TEXT_ANIMATION_DISPLAY_NAMES
+from .nodes.image.text_geometry import NODE_CLASS_MAPPINGS as IMAGE_TEXT_GEOMETRY_CLASSES
+from .nodes.image.text_geometry import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_TEXT_GEOMETRY_DISPLAY_NAMES
+from .nodes.image.filters import NODE_CLASS_MAPPINGS as IMAGE_FILTER_CLASSES
+from .nodes.image.filters import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_FILTER_DISPLAY_NAMES
+from .nodes.image.filter_animation import NODE_CLASS_MAPPINGS as IMAGE_FILTER_ANIMATION_CLASSES
+from .nodes.image.filter_animation import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_FILTER_ANIMATION_DISPLAY_NAMES
+from .nodes.image.composite import NODE_CLASS_MAPPINGS as IMAGE_COMPOSITE_CLASSES
+from .nodes.image.composite import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_COMPOSITE_DISPLAY_NAMES
+from .nodes.image.keying import NODE_CLASS_MAPPINGS as IMAGE_KEYING_CLASSES
+from .nodes.image.keying import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_KEYING_DISPLAY_NAMES
+from .nodes.image.fusion import NODE_CLASS_MAPPINGS as IMAGE_FUSION_CLASSES
+from .nodes.image.fusion import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_FUSION_DISPLAY_NAMES
+from .nodes.image.color import NODE_CLASS_MAPPINGS as IMAGE_COLOR_CLASSES
+from .nodes.image.color import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_COLOR_DISPLAY_NAMES
+from .nodes.image.compare import NODE_CLASS_MAPPINGS as IMAGE_COMPARE_CLASSES
+from .nodes.image.compare import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_COMPARE_DISPLAY_NAMES
+from .nodes.video.animation import NODE_CLASS_MAPPINGS as VIDEO_ANIMATION_CLASSES
+from .nodes.video.animation import NODE_DISPLAY_NAME_MAPPINGS as VIDEO_ANIMATION_DISPLAY_NAMES
+from .nodes.tools.help import NODE_CLASS_MAPPINGS as TOOL_HELP_CLASSES
+from .nodes.tools.help import NODE_DISPLAY_NAME_MAPPINGS as TOOL_HELP_DISPLAY_NAMES
+from .nodes.tools.text import NODE_CLASS_MAPPINGS as TOOL_TEXT_CLASSES
+from .nodes.tools.text import NODE_DISPLAY_NAME_MAPPINGS as TOOL_TEXT_DISPLAY_NAMES
+from .nodes.tools.batch import NODE_CLASS_MAPPINGS as TOOL_BATCH_CLASSES
+from .nodes.tools.batch import NODE_DISPLAY_NAME_MAPPINGS as TOOL_BATCH_DISPLAY_NAMES
+from .nodes.tools.excel import NODE_CLASS_MAPPINGS as TOOL_EXCEL_CLASSES
+from .nodes.tools.excel import NODE_DISPLAY_NAME_MAPPINGS as TOOL_EXCEL_DISPLAY_NAMES
+from .nodes.tools.workflow import NODE_CLASS_MAPPINGS as TOOL_WORKFLOW_CLASSES
+from .nodes.tools.workflow import NODE_DISPLAY_NAME_MAPPINGS as TOOL_WORKFLOW_DISPLAY_NAMES
+from .nodes.image.color_lut import NODE_CLASS_MAPPINGS as IMAGE_COLOR_LUT_CLASSES
+from .nodes.image.color_lut import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_COLOR_LUT_DISPLAY_NAMES
+
+
+def _merge(target, source, mapping_name):
+    duplicates = target.keys() & source.keys()
+    if duplicates:
+        names = ", ".join(sorted(duplicates))
+        raise RuntimeError(f"TUT_Nodes duplicate {mapping_name}: {names}")
+    target.update(source)
+
+
+NODE_CLASS_MAPPINGS = {}
+NODE_DISPLAY_NAME_MAPPINGS = {}
+
+_merge(NODE_CLASS_MAPPINGS, IMAGE_TEXT_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_TEXT_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_ANIMATION_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_ANIMATION_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_TEXT_ADVANCED_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_TEXT_ADVANCED_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_TEXT_ANIMATION_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_TEXT_ANIMATION_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_TEXT_GEOMETRY_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_TEXT_GEOMETRY_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_FILTER_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_FILTER_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_FILTER_ANIMATION_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_FILTER_ANIMATION_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_COMPOSITE_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_COMPOSITE_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_KEYING_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_KEYING_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_FUSION_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_FUSION_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_COLOR_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_COLOR_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_COLOR_LUT_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_COLOR_LUT_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, IMAGE_COMPARE_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, IMAGE_COMPARE_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, VIDEO_ANIMATION_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, VIDEO_ANIMATION_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, TOOL_HELP_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, TOOL_HELP_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, TOOL_TEXT_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, TOOL_TEXT_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, TOOL_BATCH_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, TOOL_BATCH_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, TOOL_EXCEL_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, TOOL_EXCEL_DISPLAY_NAMES, "display name")
+_merge(NODE_CLASS_MAPPINGS, TOOL_WORKFLOW_CLASSES, "node id")
+_merge(NODE_DISPLAY_NAME_MAPPINGS, TOOL_WORKFLOW_DISPLAY_NAMES, "display name")
