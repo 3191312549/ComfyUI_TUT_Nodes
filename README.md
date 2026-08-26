@@ -1,19 +1,19 @@
-# TUT_Nodes
+# [ComfyUI_TUT_Nodes](https://github.com/3191312549/ComfyUI_TUT_Nodes)
 
 面向持续扩展的 ComfyUI 自定义节点插件。本公开版提供文字排版与动画、几何文字、专业合成、电影调色、艺术滤镜、图片抠像、视频补帧、Excel 读取、文本与列表批次处理、图像对比、帮助查看和动画 GIF 保存，共 57 个正式节点。
 
 ## 安装
 
-将整个 `TUT_Nodes` 目录复制到：
+将整个 `ComfyUI_TUT_Nodes` 目录复制到：
 
 ```text
-ComfyUI/custom_nodes/TUT_Nodes
+ComfyUI/custom_nodes/ComfyUI_TUT_Nodes
 ```
 
 然后在 ComfyUI 的 Python 环境中安装文字塑形依赖：
 
 ```powershell
-python -m pip install -r ComfyUI/custom_nodes/TUT_Nodes/requirements.txt
+python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 ```
 
 `uharfbuzz` 用于复杂文字塑形；OpenCV 用于专业合成、透视、位移、形态学和电影调色；`openpyxl` 用于读取 `.xlsx` 和 `.xlsm`。插件不会在导入时自动安装依赖。
@@ -192,7 +192,7 @@ Excel 节点采用“加载一次、处理多次”的连接方式：先用 `TUT
 插件会扫描系统字体，并支持插件自带字体目录：
 
 ```text
-TUT_Nodes/fonts
+ComfyUI_TUT_Nodes/fonts
 ```
 
 将 `.ttf`、`.otf` 或 `.ttc` 文件放入该目录后重启 ComfyUI。插件字体以 `builtin/` 开头，系统字体以 `system/` 开头。
