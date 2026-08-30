@@ -2,10 +2,10 @@ import unittest
 
 import torch
 
-from TUT_Nodes.core.filters import _smooth_noise
+from ComfyUI_TUT_Nodes.core.filters import _smooth_noise
 
-from TUT_Nodes.nodes.image.filter_animation import TUT_AnimatedFilterSequence
-from TUT_Nodes.nodes.image.filters import (
+from ComfyUI_TUT_Nodes.nodes.image.filter_animation import TUT_AnimatedFilterSequence
+from ComfyUI_TUT_Nodes.nodes.image.filters import (
     TUT_ComicFilter,
     TUT_GlassRefractionFilter,
     TUT_GlitchArtFilter,

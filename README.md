@@ -1,6 +1,6 @@
 # [ComfyUI_TUT_Nodes](https://github.com/3191312549/ComfyUI_TUT_Nodes)
 
-面向持续扩展的 ComfyUI 自定义节点插件。本公开版提供文字排版与动画、几何文字、专业合成、电影调色、艺术滤镜、图片抠像、视频补帧、Excel 读取、文本与列表批次处理、图像对比、帮助查看和动画 GIF 保存，共 57 个正式节点。
+面向持续扩展的 ComfyUI 自定义节点插件。本公开版提供文字排版与动画、几何文字、专业合成、漫画分镜、电影调色、艺术滤镜、图片抠像、潜空间放大、LoRA 强度测试、视频补帧、Excel 读取、文本与图片批次处理、图像对比、帮助查看和动画 GIF 保存，共 61 个正式节点。
 
 ## 安装
 
@@ -27,10 +27,13 @@ TUT_Nodes → 图片 → 调色
 TUT_Nodes → 图片 → 合成
 TUT_Nodes → 图片 → 动画
 TUT_Nodes → 图片 → 抠像
+TUT_Nodes → 图片 → 漫画
 TUT_Nodes → 图片
 TUT_Nodes → 视频 → 动画
 TUT_Nodes → 工具 → Excel
 TUT_Nodes → 工具 → 批次
+TUT_Nodes → 模型 → LoRA
+TUT_Nodes → 潜空间 → 放大
 ```
 
 节点界面的标题、参数、下拉选项、输入/输出端口、提示和错误，凡能准确使用中文表达的均显示为中文。为兼容已发布接口，工作流文件中的内部字段名和值仍可保持原有格式。
@@ -64,8 +67,24 @@ TUT_Nodes → 工具 → 批次
 - `TUT_图像对比`：叠加预览图像 A 与图像 B，图片上方以轻量文字标明左侧 A 和右侧 B，并通过无图标的滑动分割线检查差异。
 - `TUT_LUT加载与预览`：上传或选择 `.cube`、`.3dl`、`.1dlut`、Hald/ReShade PNG，使用外接或手动上传图片滑动比较原图与 LUT 效果，并输出可复用 LUT 数据。
 - `TUT_3D LUT调色`：接收加载节点的 LUT 数据或兼容旧工作流的文件路径，支持强度、MASK、批次、1D 线性插值和 3D 三线性插值。
+- `TUT_图像到批次`：连接一张张 IMAGE，自动增减最多十个输入接口，并将全部输入按顺序合并成一个批次。
+- `TUT_漫画分镜画布`：将 IMAGE 批次自动分页排入一至六格漫画模板，支持自由画框、实时图片预览、镜头缩放、开放边缘、吸附与图层顺序。
+- `TUT_SesquiLSR潜空间放大`：使用 SesquiLSR 在潜空间内放大 SDXL、Flux、Flux2、Ideogram 4 或 Wan 系列 LATENT。
+- `TUT_LoRA强度批量测试`：一次加载一个 LoRA，按范围或自定义列表输出严格对齐的 MODEL、CLIP、强度和标签列表。
 
 LUT 上传文件保存在 ComfyUI 的 `input/TUT_Nodes/luts/`；也可把有权使用的 LUT 放入插件 `luts/`。LUT 数值按规范化 RGB 处理，不自动猜测或转换 Log、Rec.709、ACES 等色彩空间。
+
+### 图片批次与漫画分镜
+
+`TUT_图像到批次` 默认显示一个 IMAGE 输入。连接最后一个空接口后会自动增加下一个，断开后自动清理多余空接口，最多十个；后续图片会自动适配第一张图片的尺寸。灰度、RGB 和 RGBA 可以混合输入，存在透明通道时会为普通图片补全不透明 Alpha。
+
+把输出批次连接到 `TUT_漫画分镜画布` 后，可自动按图片数量选择一至六格模板，超过六张时分页输出。编辑器可调整画布尺寸、强制页边距、格间距、边框和背景；在画布中直接拖动画框或图片镜头，滚轮缩放镜头，并支持吸附对齐、水平翻转、镜头重置、四向开放边缘和逐格图层顺序。画格和镜头数据使用归一化坐标随工作流保存。
+
+### 潜空间放大与 LoRA 测试
+
+`TUT_SesquiLSR潜空间放大` 的缩放范围为 `1.0–2.0`，支持 SDXL、Flux、Flux2、Ideogram 4 和 Wan 2.1 格式。首次执行所选格式时会从固定的 SesquiLSR 上游版本下载对应权重到 `models/TUT_Nodes/sesqui_lsr/`，并校验文件大小与 SHA256；模型权重不随插件仓库分发。第三方来源和 MIT 许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+`TUT_LoRA强度批量测试` 支持范围升降序和自定义强度列表，CLIP 可选择跟随模型强度、固定强度或不应用。各档位都从原始 MODEL/CLIP 独立应用，不会累积上一档补丁；输出列表保持严格等长同序。
 
 ### 节点帮助
 
@@ -211,11 +230,14 @@ TUT_Nodes/图片/调色
 TUT_Nodes/图片/合成
 TUT_Nodes/图片/动画
 TUT_Nodes/图片/抠像
+TUT_Nodes/图片/漫画
 TUT_Nodes/视频/动画
 TUT_Nodes/工具/文件
 TUT_Nodes/工具/文本
 TUT_Nodes/工具/Excel
 TUT_Nodes/工具/批次
+TUT_Nodes/模型/LoRA
+TUT_Nodes/潜空间/放大
 ```
 
 新增节点组时，在相应的 `nodes/<大类>/` 模块中定义映射，并在 `registry.py` 中合并即可。

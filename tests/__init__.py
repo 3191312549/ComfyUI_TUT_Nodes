@@ -1,2 +1,1 @@
-"""Tests for TUT_Nodes."""
-
+"""Tests for ComfyUI_TUT_Nodes."""

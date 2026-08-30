@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 
 from openpyxl import Workbook
 
-from TUT_Nodes.categories import TOOLS_EXCEL
-from TUT_Nodes.core.excel import (
+from ComfyUI_TUT_Nodes.categories import TOOLS_EXCEL
+from ComfyUI_TUT_Nodes.core.excel import (
     decode_separator,
     excel_file_fingerprint,
     inspect_excel_workbook,
@@ -16,7 +16,7 @@ from TUT_Nodes.core.excel import (
     select_excel_line,
     slice_excel_table,
 )
-from TUT_Nodes.nodes.tools.excel import (
+from ComfyUI_TUT_Nodes.nodes.tools.excel import (
     TUT_LoadExcel,
     TUT_ReadExcelBatch,
     TUT_ReadExcelMerged,

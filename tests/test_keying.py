@@ -8,12 +8,12 @@ import numpy as np
 import torch
 from PIL import Image
 
-from TUT_Nodes.nodes.image.keying import (
+from ComfyUI_TUT_Nodes.nodes.image.keying import (
     TUT_AIKeying,
     TUT_ColorKeying,
     TUT_SAMMaskKeying,
 )
-from TUT_Nodes.core.keying import clear_rembg_session_cache
+from ComfyUI_TUT_Nodes.core.keying import clear_rembg_session_cache
 
 
 class KeyingTestCase(unittest.TestCase):
@@ -211,7 +211,7 @@ class AIKeyingTests(KeyingTestCase):
                 raise ModuleNotFoundError("rembg")
             return real_import(name, *args, **kwargs)
 
-        with patch("TUT_Nodes.core.keying.importlib.import_module", side_effect=import_without_rembg):
+        with patch("ComfyUI_TUT_Nodes.core.keying.importlib.import_module", side_effect=import_without_rembg):
             with self.assertRaisesRegex(RuntimeError, "rembg"):
                 TUT_AIKeying().key(
                     image, "birefnet-general-lite", "cpu", 0, 0.0, False,

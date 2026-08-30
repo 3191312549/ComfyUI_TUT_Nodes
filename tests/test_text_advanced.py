@@ -2,10 +2,10 @@ import unittest
 
 import torch
 
-from TUT_Nodes.core.fonts import font_display_name, font_metadata, font_options, resolve_font
-from TUT_Nodes.core.shaping import harfbuzz_available, shape_text
-from TUT_Nodes.core.text_layout import measure_text_layout, render_layout_mask, segment_text
-from TUT_Nodes.nodes.image.text_advanced import (
+from ComfyUI_TUT_Nodes.core.fonts import font_display_name, font_metadata, font_options, resolve_font
+from ComfyUI_TUT_Nodes.core.shaping import harfbuzz_available, shape_text
+from ComfyUI_TUT_Nodes.core.text_layout import measure_text_layout, render_layout_mask, segment_text
+from ComfyUI_TUT_Nodes.nodes.image.text_advanced import (
     TUT_区域自适应文字,
     TUT_字体预览墙,
     TUT_逐字逐词遮罩,

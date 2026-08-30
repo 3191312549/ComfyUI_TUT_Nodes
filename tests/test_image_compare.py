@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import torch
 
-from TUT_Nodes.categories import IMAGE
-from TUT_Nodes.nodes.image.compare import (
+from ComfyUI_TUT_Nodes.categories import IMAGE
+from ComfyUI_TUT_Nodes.nodes.image.compare import (
     NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS,
     TUT_ImageCompare,

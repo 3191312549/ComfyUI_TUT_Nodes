@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from TUT_Nodes.categories import IMAGE_COMPOSITE, IMAGE_KEYING
-from TUT_Nodes.nodes.image.fusion import (
+from ComfyUI_TUT_Nodes.categories import IMAGE_COMPOSITE, IMAGE_KEYING
+from ComfyUI_TUT_Nodes.nodes.image.fusion import (
     NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS, TUT_ChannelBoolean,
     TUT_CornerPinComposite, TUT_DepthMerge, TUT_DifferenceKeying,
     TUT_DisplaceComposite, TUT_LightWrapComposite, TUT_MatteFinesse,

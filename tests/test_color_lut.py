@@ -9,8 +9,8 @@ import numpy as np
 import torch
 from PIL import Image
 
-from TUT_Nodes.categories import IMAGE_COLOR
-from TUT_Nodes.core.color_lut import (
+from ComfyUI_TUT_Nodes.categories import IMAGE_COLOR
+from ComfyUI_TUT_Nodes.core.color_lut import (
     _load_lut_cached,
     apply_3d_lut,
     apply_lut_data,
@@ -21,7 +21,7 @@ from TUT_Nodes.core.color_lut import (
     load_lut_data,
     parse_curve_data,
 )
-from TUT_Nodes.nodes.image.color_lut import (
+from ComfyUI_TUT_Nodes.nodes.image.color_lut import (
     DEFAULT_CURVES,
     NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS,

@@ -1,7 +1,7 @@
 import unittest
 
-from TUT_Nodes.categories import TOOLS_TEXT
-from TUT_Nodes.nodes.tools.text import TUT_SplitTextBatch
+from ComfyUI_TUT_Nodes.categories import TOOLS_TEXT
+from ComfyUI_TUT_Nodes.nodes.tools.text import TUT_SplitTextBatch
 
 
 class TUTSplitTextBatchTests(unittest.TestCase):

@@ -6,24 +6,27 @@ from tempfile import TemporaryDirectory
 import torch
 from PIL import Image
 
-from TUT_Nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
-from TUT_Nodes.categories import (
+from ComfyUI_TUT_Nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from ComfyUI_TUT_Nodes.categories import (
     IMAGE,
     IMAGE_ANIMATION,
     IMAGE_COLOR,
     IMAGE_COMPOSITE,
     IMAGE_FILTER,
     IMAGE_KEYING,
+    IMAGE_COMIC,
     IMAGE_TEXT,
+    LATENT_UPSCALING,
+    MODEL_LORA,
     TOOLS_BATCH,
     TOOLS_EXCEL,
     TOOLS_WORKFLOW,
     TOOLS_TEXT,
     VIDEO_ANIMATION,
 )
-from TUT_Nodes.core.fonts import font_options
-from TUT_Nodes.core.imaging import render_text_mask
-from TUT_Nodes.nodes.image.text import (
+from ComfyUI_TUT_Nodes.core.fonts import font_options
+from ComfyUI_TUT_Nodes.core.imaging import render_text_mask
+from ComfyUI_TUT_Nodes.nodes.image.text import (
     TUT_CompositeText,
     TUT_DrawText,
     TUT_MaskText,
@@ -33,7 +36,7 @@ from TUT_Nodes.nodes.image.text import (
     TUT_SimpleTextWatermark,
     TUT_TextEffect,
 )
-from TUT_Nodes.nodes.image.animation import (
+from ComfyUI_TUT_Nodes.nodes.image.animation import (
     GIF_COLOR_LEVELS,
     GIF_COMPRESSION_PRESETS,
     TUT_SaveAnimatedGIF,
@@ -63,6 +66,10 @@ EXPECTED_NODE_IDS = {
     "TUT_ColorCurves", "TUT_LUT", "TUT_LUTLoaderPreview",
     "TUT_ImageCompare",
     "TUT_GIMMVFIInterpolate",
+    "TUT_ImageToBatch",
+    "TUT_ComicPanelCanvas",
+    "TUT_SesquiLatentUpscale",
+    "TUT_LoraStrengthTester",
 }
 
 
@@ -91,6 +98,15 @@ class TUTNodesSmokeTests(unittest.TestCase):
             if node_id == "TUT_GIMMVFIInterpolate":
                 self.assertEqual(node_class.CATEGORY, VIDEO_ANIMATION)
                 continue
+            if node_id == "TUT_ComicPanelCanvas":
+                self.assertEqual(node_class.CATEGORY, IMAGE_COMIC)
+                continue
+            if node_id == "TUT_SesquiLatentUpscale":
+                self.assertEqual(node_class.CATEGORY, LATENT_UPSCALING)
+                continue
+            if node_id == "TUT_LoraStrengthTester":
+                self.assertEqual(node_class.CATEGORY, MODEL_LORA)
+                continue
             if node_id in {
                 "TUT_SoftLayerComposite", "TUT_LightWrapComposite", "TUT_DepthMerge",
                 "TUT_CornerPinComposite", "TUT_ChannelBoolean", "TUT_DisplaceComposite",
@@ -116,7 +132,7 @@ class TUTNodesSmokeTests(unittest.TestCase):
                 "TUT_ReadExcelSingleLine",
             }:
                 expected = TOOLS_EXCEL
-            elif node_id == "TUT_SelectBatchItem":
+            elif node_id in {"TUT_SelectBatchItem", "TUT_ImageToBatch"}:
                 expected = TOOLS_BATCH
             elif node_id == "TUT_DelayPassThrough":
                 expected = TOOLS_WORKFLOW

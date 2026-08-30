@@ -2,8 +2,8 @@ import math
 import unittest
 from unittest.mock import patch
 
-from TUT_Nodes.categories import TOOLS_WORKFLOW
-from TUT_Nodes.nodes.tools.workflow import TUT_DelayPassThrough
+from ComfyUI_TUT_Nodes.categories import TOOLS_WORKFLOW
+from ComfyUI_TUT_Nodes.nodes.tools.workflow import TUT_DelayPassThrough
 
 
 class TUTDelayPassThroughTests(unittest.TestCase):
@@ -20,13 +20,13 @@ class TUTDelayPassThroughTests(unittest.TestCase):
 
     def test_waits_in_seconds_and_returns_same_object(self):
         value = {"任意": [1, 2, 3]}
-        with patch("TUT_Nodes.nodes.tools.workflow.time.sleep") as sleep:
+        with patch("ComfyUI_TUT_Nodes.nodes.tools.workflow.time.sleep") as sleep:
             result = TUT_DelayPassThrough().wait_and_pass(value, 1250)
         sleep.assert_called_once_with(1.25)
         self.assertIs(result[0], value)
 
     def test_zero_delay_is_supported(self):
-        with patch("TUT_Nodes.nodes.tools.workflow.time.sleep") as sleep:
+        with patch("ComfyUI_TUT_Nodes.nodes.tools.workflow.time.sleep") as sleep:
             self.assertEqual(TUT_DelayPassThrough().wait_and_pass("内容", 0), ("内容",))
         sleep.assert_called_once_with(0.0)
 

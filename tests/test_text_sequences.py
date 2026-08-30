@@ -3,10 +3,10 @@ import unittest
 import torch
 from PIL import Image, ImageDraw
 
-from TUT_Nodes.core.fonts import font_options
-from TUT_Nodes.nodes.image.text_animation import ANIMATIONS, TUT_动态文字序列
-from TUT_Nodes.nodes.image.text_geometry import TRANSFORMS, TUT_文字变形, TUT_文字沿路径
-from TUT_Nodes.core.text_layout import sample_mask_path
+from ComfyUI_TUT_Nodes.core.fonts import font_options
+from ComfyUI_TUT_Nodes.nodes.image.text_animation import ANIMATIONS, TUT_动态文字序列
+from ComfyUI_TUT_Nodes.nodes.image.text_geometry import TRANSFORMS, TUT_文字变形, TUT_文字沿路径
+from ComfyUI_TUT_Nodes.core.text_layout import sample_mask_path
 
 
 class TUTTextSequenceTests(unittest.TestCase):

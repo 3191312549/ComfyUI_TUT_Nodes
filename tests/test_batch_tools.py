@@ -1,7 +1,7 @@
 import unittest
 
-from TUT_Nodes.categories import TOOLS_BATCH
-from TUT_Nodes.nodes.tools.batch import TUT_SelectBatchItem
+from ComfyUI_TUT_Nodes.categories import TOOLS_BATCH
+from ComfyUI_TUT_Nodes.nodes.tools.batch import TUT_SelectBatchItem
 
 
 class TUTSelectBatchItemTests(unittest.TestCase):

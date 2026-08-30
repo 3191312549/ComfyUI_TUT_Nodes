@@ -3,9 +3,9 @@ import unittest
 import numpy as np
 import torch
 
-from TUT_Nodes.categories import IMAGE_COLOR
-from TUT_Nodes.core.color import advanced_auto_color_correct, film_tone
-from TUT_Nodes.nodes.image.color import (
+from ComfyUI_TUT_Nodes.categories import IMAGE_COLOR
+from ComfyUI_TUT_Nodes.core.color import advanced_auto_color_correct, film_tone
+from ComfyUI_TUT_Nodes.nodes.image.color import (
     NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS,
     TUT_AutoColorCorrect,

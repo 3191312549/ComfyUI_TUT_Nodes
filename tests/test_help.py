@@ -3,8 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from TUT_Nodes.nodes.image.text import TUT_DrawText
-from TUT_Nodes.nodes.tools.help import TUT_NodeHelp, format_node_help
+from ComfyUI_TUT_Nodes.nodes.image.text import TUT_DrawText
+from ComfyUI_TUT_Nodes.nodes.tools.help import TUT_NodeHelp, format_node_help
 
 
 class TUTNodeHelpTests(unittest.TestCase):

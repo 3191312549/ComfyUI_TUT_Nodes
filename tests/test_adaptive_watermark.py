@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from TUT_Nodes.core.fonts import font_options
-from TUT_Nodes.nodes.image.text import TUT_AutoContrastWatermark
+from ComfyUI_TUT_Nodes.core.fonts import font_options
+from ComfyUI_TUT_Nodes.nodes.image.text import TUT_AutoContrastWatermark
 
 
 class TUTAdaptiveWatermarkTests(unittest.TestCase):

@@ -2,7 +2,7 @@ import unittest
 
 import torch
 
-from TUT_Nodes.nodes.image.composite import PRESETS, TUT_柔边图层合成
+from ComfyUI_TUT_Nodes.nodes.image.composite import PRESETS, TUT_柔边图层合成
 
 
 SHAPES = ("圆角", "切角", "波浪", "撕裂")

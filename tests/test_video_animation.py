@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import torch
 
-from TUT_Nodes.nodes.video.animation import TUT_GIMMVFIInterpolate
+from ComfyUI_TUT_Nodes.nodes.video.animation import TUT_GIMMVFIInterpolate
 
 
 class TUTVideoAnimationTests(unittest.TestCase):
