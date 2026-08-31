@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title">
+  <title id="title">调色与合成节点工作流</title><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#64748b"/></marker><filter id="s"><feDropShadow dy="5" stdDeviation="7" flood-opacity=".22"/></filter></defs>
+  <rect width="1200" height="300" rx="24" fill="#f8f7ff"/><text x="55" y="55" font-family="Arial,'Microsoft YaHei'" font-size="25" font-weight="700" fill="#172033">图片处理：先校正，再塑造风格</text>
+  <g font-family="Arial,'Microsoft YaHei'" filter="url(#s)">
+    <g transform="translate(55 92)"><rect width="208" height="126" rx="12" fill="#172033"/><rect width="208" height="34" rx="12" fill="#475569"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">输入图片</text><text x="18" y="75" fill="#cbd5e1" font-size="14">IMAGE + 可选 MASK</text></g>
+    <g transform="translate(312 92)"><rect width="220" height="126" rx="12" fill="#172033"/><rect width="220" height="34" rx="12" fill="#7c3aed"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">TUT_自动基础校色</text><text x="18" y="70" fill="#cbd5e1" font-size="14">白平衡 · 曝光</text><text x="18" y="98" fill="#cbd5e1" font-size="14">一键建立干净底图</text></g>
+    <g transform="translate(581 92)"><rect width="220" height="126" rx="12" fill="#172033"/><rect width="220" height="34" rx="12" fill="#8b5cf6"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">明暗 + 色彩 + 细节</text><text x="18" y="70" fill="#cbd5e1" font-size="14">对比 · 饱和 · 清晰度</text><text x="18" y="98" fill="#cbd5e1" font-size="14">按需串联，逐步调整</text></g>
+    <g transform="translate(850 92)"><rect width="295" height="126" rx="12" fill="#172033"/><rect width="295" height="34" rx="12" fill="#db2777"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">风格与输出</text><text x="18" y="70" fill="#cbd5e1" font-size="14">HSL / 曲线 / LUT / 滤镜</text><text x="18" y="98" fill="#cbd5e1" font-size="14">抠像 / 图层合成 / 图像对比</text></g>
+  </g>
+  <g stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#a)"><path d="M263 155H302"/><path d="M532 155H571"/><path d="M801 155H840"/></g>
+  <text x="600" y="258" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="15" fill="#64748b">强度为 0 或 MASK 全黑时，多数处理节点会保留原图</text>
+</svg>

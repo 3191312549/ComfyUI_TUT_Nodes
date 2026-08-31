@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">TUT Nodes 功能总览</title>
+  <desc id="desc">展示文字、调色、滤镜、抠像、合成、漫画、工具和模型动画八类节点</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#101827"/><stop offset="1" stop-color="#172238"/></linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#67e8f9"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity=".25"/></filter>
+  </defs>
+  <rect width="1200" height="430" rx="26" fill="url(#bg)"/><circle cx="1080" cy="-30" r="210" fill="#7c3aed" opacity=".12"/><circle cx="80" cy="440" r="220" fill="#06b6d4" opacity=".1"/>
+  <text x="64" y="78" fill="url(#brand)" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="38" font-weight="700">ComfyUI_TUT_Nodes</text>
+  <text x="64" y="116" fill="#aab7cc" font-family="Arial,'Microsoft YaHei',sans-serif" font-size="19">中文界面 · 61 个实用节点 · 从创作到批量输出</text>
+  <g font-family="Arial,'Microsoft YaHei',sans-serif" filter="url(#shadow)">
+    <g transform="translate(64 158)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#22d3ee"/><circle cx="38" cy="36" r="18" fill="#164e63"/><text x="38" y="43" text-anchor="middle" fill="#67e8f9" font-size="20">字</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">文字</text><text x="70" y="66" fill="#9fb0c7" font-size="15">排版 · 特效 · 动画</text></g>
+    <g transform="translate(331 158)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#a78bfa"/><circle cx="38" cy="36" r="18" fill="#4c1d95"/><text x="38" y="43" text-anchor="middle" fill="#c4b5fd" font-size="20">色</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">调色</text><text x="70" y="66" fill="#9fb0c7" font-size="15">曲线 · LUT · 电影色调</text></g>
+    <g transform="translate(598 158)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#fb7185"/><circle cx="38" cy="36" r="18" fill="#881337"/><text x="38" y="43" text-anchor="middle" fill="#fda4af" font-size="20">效</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">滤镜</text><text x="70" y="66" fill="#9fb0c7" font-size="15">漫画 · 像素 · 故障</text></g>
+    <g transform="translate(865 158)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#34d399"/><circle cx="38" cy="36" r="18" fill="#064e3b"/><text x="38" y="43" text-anchor="middle" fill="#6ee7b7" font-size="20">抠</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">抠像</text><text x="70" y="66" fill="#9fb0c7" font-size="15">颜色 · AI · SAM</text></g>
+    <g transform="translate(64 276)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#fbbf24"/><circle cx="38" cy="36" r="18" fill="#78350f"/><text x="38" y="43" text-anchor="middle" fill="#fde68a" font-size="20">合</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">合成</text><text x="70" y="66" fill="#9fb0c7" font-size="15">图层 · 深度 · 透视</text></g>
+    <g transform="translate(331 276)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#f472b6"/><circle cx="38" cy="36" r="18" fill="#831843"/><text x="38" y="43" text-anchor="middle" fill="#f9a8d4" font-size="20">漫</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">漫画</text><text x="70" y="66" fill="#9fb0c7" font-size="15">批次排版 · 分镜画布</text></g>
+    <g transform="translate(598 276)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#60a5fa"/><circle cx="38" cy="36" r="18" fill="#1e3a8a"/><text x="38" y="43" text-anchor="middle" fill="#93c5fd" font-size="20">工</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">工具</text><text x="70" y="66" fill="#9fb0c7" font-size="15">批次 · Excel · 帮助</text></g>
+    <g transform="translate(865 276)"><rect width="245" height="92" rx="14" fill="#202d46" stroke="#c084fc"/><circle cx="38" cy="36" r="18" fill="#581c87"/><text x="38" y="43" text-anchor="middle" fill="#d8b4fe" font-size="20">模</text><text x="70" y="38" fill="#f8fafc" font-size="20" font-weight="700">模型与动画</text><text x="70" y="66" fill="#9fb0c7" font-size="15">LoRA · 放大 · 补帧</text></g>
+  </g>
+</svg>

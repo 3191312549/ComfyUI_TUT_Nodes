@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title">
+  <title id="title">文字与动画节点工作流</title><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#64748b"/></marker><filter id="s"><feDropShadow dy="5" stdDeviation="7" flood-opacity=".25"/></filter></defs>
+  <rect width="1200" height="300" rx="24" fill="#f5f7fb"/><text x="55" y="55" font-family="Arial,'Microsoft YaHei'" font-size="25" font-weight="700" fill="#172033">文字与动画：从图片到 GIF</text>
+  <g font-family="Arial,'Microsoft YaHei'" filter="url(#s)">
+    <g transform="translate(55 92)"><rect width="210" height="126" rx="12" fill="#172033"/><rect width="210" height="34" rx="12" fill="#334155"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">输入图片 / 空画布</text><text x="18" y="72" fill="#cbd5e1" font-size="14">IMAGE</text><circle cx="196" cy="68" r="6" fill="#22d3ee"/></g>
+    <g transform="translate(335 92)"><rect width="225" height="126" rx="12" fill="#172033"/><rect width="225" height="34" rx="12" fill="#0891b2"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">TUT_叠加文字</text><text x="18" y="70" fill="#cbd5e1" font-size="14">文字 · 字体 · 位置</text><text x="18" y="98" fill="#cbd5e1" font-size="14">输出 IMAGE + MASK</text><circle cx="211" cy="68" r="6" fill="#22d3ee"/><circle cx="211" cy="96" r="6" fill="#f472b6"/></g>
+    <g transform="translate(630 92)"><rect width="225" height="126" rx="12" fill="#172033"/><rect width="225" height="34" rx="12" fill="#7c3aed"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">TUT_文字特效</text><text x="18" y="70" fill="#cbd5e1" font-size="14">描边 · 阴影 · 发光</text><text x="18" y="98" fill="#cbd5e1" font-size="14">渐变 · 浮雕 · 挤出</text><circle cx="211" cy="68" r="6" fill="#22d3ee"/></g>
+    <g transform="translate(925 92)"><rect width="220" height="126" rx="12" fill="#172033"/><rect width="220" height="34" rx="12" fill="#db2777"/><text x="16" y="23" fill="white" font-size="15" font-weight="700">TUT_保存动画 GIF</text><text x="18" y="70" fill="#cbd5e1" font-size="14">帧率 · 循环 · 压缩</text><text x="18" y="98" fill="#cbd5e1" font-size="14">输出 GIF 文件</text></g>
+  </g>
+  <g stroke="#64748b" stroke-width="3" fill="none" marker-end="url(#a)"><path d="M265 155H325"/><path d="M560 155H620"/><path d="M855 155H915"/></g>
+  <text x="600" y="258" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="15" fill="#64748b">也可把“叠加文字”替换为区域自适应文字、动态文字序列、文字变形或文字沿路径</text>
+</svg>
