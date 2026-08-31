@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 
 import torch
-import torch.nn.functional as torch_functional
 
 from ...categories import TOOLS_BATCH
 
@@ -35,7 +34,7 @@ class TUT_ImageToBatch:
     RETURN_NAMES = ("images",)
     FUNCTION = "make_batch"
     CATEGORY = TOOLS_BATCH
-    DESCRIPTION = "按接口顺序将最多十个 IMAGE 输入合并为一个批次；自动统一尺寸及 RGB/RGBA 通道，连接或断开时自动增减输入接口。"
+    DESCRIPTION = "按接口顺序将最多十个 IMAGE 输入合并为一个批次；图片保持原始比例与像素尺寸，不同画幅会居中补透明边到最大画布。"
 
     def make_batch(self, **kwargs):
         indexed = []
@@ -53,8 +52,14 @@ class TUT_ImageToBatch:
         indexed.sort(key=lambda item: item[0])
 
         first = indexed[0][1]
-        target_height, target_width = first.shape[1:3]
-        target_channels = 4 if any(image.shape[-1] == 4 for _, image in indexed) else 3
+        target_height = max(int(image.shape[1]) for _, image in indexed)
+        target_width = max(int(image.shape[2]) for _, image in indexed)
+        has_size_mismatch = any(
+            image.shape[1:3] != (target_height, target_width) for _, image in indexed
+        )
+        target_channels = 4 if has_size_mismatch or any(
+            image.shape[-1] == 4 for _, image in indexed
+        ) else 3
         target_device, target_dtype = first.device, first.dtype
         normalized = []
         for index, image in indexed:
@@ -63,12 +68,19 @@ class TUT_ImageToBatch:
                 current = current.repeat(1, 1, 1, 3)
             if target_channels == 4 and current.shape[-1] == 3:
                 current = torch.cat((current, torch.ones_like(current[..., :1])), dim=-1)
-            if current.shape[1:3] != (target_height, target_width):
-                current = torch_functional.interpolate(
-                    current.movedim(-1, 1), size=(target_height, target_width),
-                    mode="bilinear", align_corners=False,
-                ).movedim(1, -1)
-            normalized.append(current)
+            height, width = int(current.shape[1]), int(current.shape[2])
+            if (height, width) == (target_height, target_width):
+                normalized.append(current)
+                continue
+            top = (target_height - height) // 2
+            left = (target_width - width) // 2
+            canvas = torch.zeros(
+                (current.shape[0], target_height, target_width, target_channels),
+                dtype=target_dtype,
+                device=target_device,
+            )
+            canvas[:, top:top + height, left:left + width, :] = current
+            normalized.append(canvas)
         return (torch.cat(normalized, dim=0),)
 
 

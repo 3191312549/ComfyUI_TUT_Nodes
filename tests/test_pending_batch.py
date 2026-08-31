@@ -28,15 +28,35 @@ class ImageToBatchTests(unittest.TestCase):
         output = self.node.make_batch(image_1=image)[0]
         self.assertTrue(torch.equal(output, image))
 
-    def test_inputs_are_sorted_resized_and_batches_are_expanded(self):
+    def test_inputs_are_sorted_center_padded_and_batches_are_expanded(self):
         first = torch.zeros((1, 8, 12, 3), dtype=torch.float32)
         second = torch.ones((2, 4, 6, 3), dtype=torch.float32)
         third = torch.full((1, 8, 12, 3), 0.5, dtype=torch.float32)
         output = self.node.make_batch(image_3=third, image_1=first, image_2=second)[0]
-        self.assertEqual(tuple(output.shape), (4, 8, 12, 3))
-        self.assertEqual(float(output[0].max()), 0.0)
-        self.assertEqual(float(output[1:3].min()), 1.0)
-        self.assertTrue(torch.allclose(output[3], torch.full_like(output[3], 0.5)))
+        self.assertEqual(tuple(output.shape), (4, 8, 12, 4))
+        self.assertEqual(float(output[0, ..., :3].max()), 0.0)
+        self.assertTrue(torch.equal(output[0, ..., 3], torch.ones((8, 12))))
+        self.assertTrue(torch.equal(output[1:3, 2:6, 3:9, :3], torch.ones((2, 4, 6, 3))))
+        self.assertTrue(torch.equal(output[1:3, 2:6, 3:9, 3], torch.ones((2, 4, 6))))
+        self.assertEqual(float(output[1:3, ..., 3].sum()), 2 * 4 * 6)
+        self.assertTrue(torch.allclose(output[3, ..., :3], torch.full_like(output[3, ..., :3], 0.5)))
+        self.assertTrue(torch.equal(output[3, ..., 3], torch.ones((8, 12))))
+
+    def test_landscape_and_portrait_keep_original_pixels_and_aspect(self):
+        landscape = torch.zeros((1, 4, 12, 3), dtype=torch.float32)
+        landscape[..., 0] = 1.0
+        portrait = torch.zeros((1, 10, 4, 3), dtype=torch.float32)
+        portrait[..., 1] = 1.0
+
+        output = self.node.make_batch(image_1=landscape, image_2=portrait)[0]
+
+        self.assertEqual(tuple(output.shape), (2, 10, 12, 4))
+        self.assertTrue(torch.equal(output[0, 3:7, :, :3], landscape[0]))
+        self.assertTrue(torch.equal(output[1, :, 4:8, :3], portrait[0]))
+        self.assertEqual(int((output[0, ..., 0] > 0.5).sum()), 4 * 12)
+        self.assertEqual(int((output[1, ..., 1] > 0.5).sum()), 10 * 4)
+        self.assertEqual(float(output[0, ..., 3].sum()), 4 * 12)
+        self.assertEqual(float(output[1, ..., 3].sum()), 10 * 4)
 
     def test_clear_errors_and_ten_input_limit(self):
         with self.assertRaisesRegex(ValueError, "至少需要连接一个"):
@@ -54,10 +74,12 @@ class ImageToBatchTests(unittest.TestCase):
         mixed = self.node.make_batch(image_1=rgba, image_2=rgb)[0]
         self.assertEqual(tuple(mixed.shape), (2, 4, 6, 4))
         self.assertTrue(torch.allclose(mixed[0, ..., 3], torch.full((4, 6), 0.25)))
-        self.assertTrue(torch.equal(mixed[1, ..., 3], torch.ones((4, 6))))
+        self.assertTrue(torch.equal(mixed[1, 1:3, 1:4, 3], torch.ones((2, 3))))
+        self.assertEqual(float(mixed[1, ..., 3].sum()), 6.0)
 
         grayscale = torch.full((1, 4, 6, 1), 0.4, dtype=torch.float32)
-        gray_batch = self.node.make_batch(image_1=grayscale, image_2=rgb)[0]
+        rgb_same_size = torch.full((1, 4, 6, 3), 0.5, dtype=torch.float32)
+        gray_batch = self.node.make_batch(image_1=grayscale, image_2=rgb_same_size)[0]
         self.assertEqual(tuple(gray_batch.shape), (2, 4, 6, 3))
         self.assertTrue(torch.allclose(gray_batch[0], torch.full((4, 6, 3), 0.4)))
 
