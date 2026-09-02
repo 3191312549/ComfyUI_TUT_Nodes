@@ -1,6 +1,6 @@
 # ComfyUI_TUT_Nodes
 
-一套以中文界面为主的 ComfyUI 实用节点。公开版包含 **61 个节点**，覆盖文字排版、图片调色、滤镜、抠像、合成、漫画分镜、批次处理、Excel、LoRA 测试、潜空间放大和动画输出。
+一套以中文界面为主的 ComfyUI 实用节点。公开版包含 **63 个节点**，覆盖文字排版、图片调色、滤镜、抠像、合成、漫画分镜、音频裁剪、批次处理、Excel、LoRA 测试、潜空间放大和动画输出。
 
 ![TUT_Nodes 功能总览](docs/images/overview.svg)
 
@@ -52,6 +52,7 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 | 图片 / 抠像 | 颜色、AI、SAM、差异抠像 | 颜色抠像、AI智能抠像、遮罩边缘精修 |
 | 图片 / 合成 | 柔边、光线包裹、深度、透视 | 柔边图层合成、四角定位合成 |
 | 图片 / 漫画 | 多图自动排版和分镜 | 漫画分镜画布 |
+| 音频 | 波形预览、试听与精确裁剪 | 高级音频加载 |
 | 工具 | Excel、文本、批次、等待、帮助 | 读取Excel、图像到批次、节点帮助 |
 | 模型与动画 | LoRA 对比、潜空间放大、补帧、GIF | LoRA强度批量测试、GIMM-VFI补帧 |
 
@@ -112,10 +113,18 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 </details>
 
 <details>
-<summary><strong>图片 / 查看与漫画（2）</strong></summary>
+<summary><strong>图片 / 查看与漫画（3）</strong></summary>
 
 - `TUT_图像对比`：使用滑动分割线比较两张图片。
-- `TUT_漫画分镜画布`：把图片批次自动排成一至六格漫画，可调整画框和镜头。
+- `TUT_漫画分镜画布`：把图片批次自动排成一至六格漫画；每格可拖动顶点或边中点形成抗锯齿凸形、凹形四边框，并支持逐边开放、图层、吸附和镜头预览。
+- `TUT_[待测试]漫画对话框`：添加可拖动、缩放和分层的对白框、思考框、喊话框、旁白框或无边框文字。
+
+</details>
+
+<details>
+<summary><strong>音频（1）</strong></summary>
+
+- `TUT_高级音频加载`：上传或选择音频，在波形上试听并按采样点精确裁剪，输出时长、边界、采样率和声道数。
 
 </details>
 

@@ -3,6 +3,9 @@ import { app } from "/scripts/app.js";
 // Keep Python input names and serialized combo values unchanged so workflows
 // created before the Chinese UI extension remain fully compatible.
 export const WIDGET_LABELS = {
+    audio_file: "音频文件",
+    start_time: "开始时间（秒）",
+    end_time: "结束时间（秒）",
     image: "图像",
     images: "图像批次",
     precision: "精度",
@@ -55,6 +58,8 @@ export const WIDGET_LABELS = {
     rotation: "旋转角度",
     rotation_angle: "旋转角度",
     rotation_options: "旋转中心",
+    edge_expand: "边缘扩张",
+    edge_feather: "边缘羽化",
     opacity: "整体透明度",
     position: "位置",
     size_percent: "字号比例",
@@ -356,6 +361,19 @@ export const WIDGET_LABELS = {
     canvas_height: "画布高度",
     margin: "画布边距",
     spacing: "单元间隔",
+    layout: "分镜模板",
+    page_margin: "页面边距",
+    gutter: "画格间距",
+    border_width: "边框宽度",
+    border_color: "边框颜色",
+    empty_fill: "空格填充",
+    panel_data: "分镜配置",
+    enabled: "启用对话框",
+    default_font: "默认字体",
+    bubble_data: "对话框配置",
+    panel_mask: "画格遮罩",
+    border_mask: "画框线遮罩",
+    bubble_mask: "对话框遮罩",
     fit_mode: "图片适配",
     corner_radius: "圆角半径",
     shadow: "阴影大小",
@@ -448,9 +466,25 @@ export const WIDGET_LABELS = {
     latent: "潜空间",
     model_format: "模型格式",
     half_precision: "半精度运行",
+    clip: "CLIP",
+    lora_name: "LoRA文件",
+    generation_mode: "强度生成方式",
+    start_strength: "起始强度",
+    end_strength: "结束强度",
+    strength_step: "强度步长",
+    custom_strengths: "自定义强度列表",
+    clip_strength_mode: "CLIP强度模式",
+    fixed_clip_strength: "CLIP固定强度",
+    max_tests: "最大测试数量",
 };
 
 export const SLOT_LABELS = {
+    audio: "裁剪音频",
+    duration: "实际时长",
+    start_time: "实际开始时间",
+    end_time: "实际结束时间",
+    sample_rate: "采样率",
+    channels: "声道数",
     image_a: "图像 A",
     image_b: "图像 B",
     image: "图像",
@@ -540,6 +574,13 @@ export const SLOT_LABELS = {
     selected_item: "选中项目",
     selected_index: "选中编号",
     latent: "潜空间",
+    model: "模型",
+    models: "模型批次",
+    clip: "CLIP",
+    clips: "CLIP批次",
+    strengths: "强度批次",
+    labels: "标签批次",
+    item_count: "项目数量",
 };
 
 const EXCEL_NODE_IDS = new Set([
@@ -749,6 +790,10 @@ export function localizeNode(node) {
         node.widgets?.forEach((widget) => {
             if (EXCEL_LABELS[widget?.name]) widget.label = EXCEL_LABELS[widget.name];
         });
+    }
+    if (comfyClass === "TUT_RichTextOverlay") {
+        const align = node.widgets?.find((widget) => widget.name === "align");
+        if (align) align.label = "水平对齐";
     }
     if (comfyClass === "TUT_BasicTone") {
         const brightness = node.widgets?.find((widget) => widget.name === "brightness");

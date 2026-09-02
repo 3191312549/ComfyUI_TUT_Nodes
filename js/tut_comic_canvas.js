@@ -17,6 +17,7 @@ const PANEL_LAYOUTS = {
     [CUSTOM_LAYOUT]: [[.08, .08, .92, .92]],
 };
 const AUTO_PREVIEW_LAYOUT = "六宫格";
+const EDGE_LABELS = ["边 1", "边 2", "边 3", "边 4"];
 const SIZE_PRESETS = [
     ["1024 × 1024（1:1）", 1024, 1024], ["1536 × 1536（1:1）", 1536, 1536],
     ["1024 × 1344（16:21）", 1024, 1344], ["1024 × 1536（2:3）", 1024, 1536],
@@ -32,6 +33,42 @@ const WIDGET_NAMES = [
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, Number(value) || 0));
+const rectToQuad = ([x0, y0, x1, y1]) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+
+function quadBounds(quad) {
+    const xs = quad.map((point) => point[0]), ys = quad.map((point) => point[1]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+function segmentsIntersect(a, b, c, d) {
+    const cross = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    const abC = cross(a, b, c), abD = cross(a, b, d), cdA = cross(c, d, a), cdB = cross(c, d, b);
+    return abC * abD < -1e-10 && cdA * cdB < -1e-10;
+}
+
+function validQuad(quad) {
+    if (!Array.isArray(quad) || quad.length !== 4 || quad.some((point) => !Array.isArray(point) || point.length !== 2 || point.some((value) => !Number.isFinite(value)))) return false;
+    const area = Math.abs(quad.reduce((sum, point, index) => {
+        const next = quad[(index + 1) % 4]; return sum + point[0] * next[1] - next[0] * point[1];
+    }, 0)) / 2;
+    const shortEdge = quad.some((point, index) => Math.hypot(point[0] - quad[(index + 1) % 4][0], point[1] - quad[(index + 1) % 4][1]) < .005);
+    return area >= .0005 && !shortEdge && !segmentsIntersect(quad[0], quad[1], quad[2], quad[3]) && !segmentsIntersect(quad[1], quad[2], quad[3], quad[0]);
+}
+
+function pointInQuad(point, quad) {
+    let inside = false;
+    for (let i = 0, j = quad.length - 1; i < quad.length; j = i++) {
+        const [xi, yi] = quad[i], [xj, yj] = quad[j];
+        if ((yi > point.y) !== (yj > point.y) && point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+function syncLegacyEdges(panel) {
+    const edges = Array.isArray(panel.open_edges) && panel.open_edges.length === 4 ? panel.open_edges.map(Boolean) : [panel.overflow_top === true, panel.overflow_right === true, panel.overflow_bottom === true, panel.overflow_left === true];
+    panel.open_edges = edges;
+    [panel.overflow_top, panel.overflow_right, panel.overflow_bottom, panel.overflow_left] = edges;
+}
 
 function previewUrl(data) {
     if (!data?.filename) return null;
@@ -61,7 +98,7 @@ function ensureStyle() {
       .tut-comic-field{display:flex;flex-direction:column;gap:3px;min-width:0;color:#aaa;font-size:10px}.tut-comic-field>.tut-comic-input,.tut-comic-field>.tut-comic-select{width:100%;min-width:0}
       .tut-comic-num{width:100%;text-align:right}.tut-comic-color{width:100%;height:27px;padding:1px}.tut-comic-wide{width:100%;min-width:0}
       .tut-comic-camera-row{display:grid;grid-template-columns:auto minmax(70px,1fr) auto;gap:6px;align-items:center}.tut-comic-actions{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
-      .tut-comic-edge-row{display:grid;grid-template-columns:auto repeat(4,minmax(42px,1fr));gap:5px;align-items:center}.tut-comic-edge-toggle{display:flex;gap:3px;align-items:center;justify-content:center;white-space:nowrap;background:#25292e;border:1px solid #555;border-radius:5px;padding:4px 5px;box-sizing:border-box}.tut-comic-edge-toggle:has(input:checked){background:#167d86;border-color:#35d0c8;color:#fff}.tut-comic-edge-toggle input{margin:0}
+      .tut-comic-edge-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.tut-comic-edge-toggle{background:#25292e;color:#ddd;border:1px solid #555;border-radius:5px;padding:5px 3px;cursor:pointer}.tut-comic-edge-toggle:hover,.tut-comic-edge-toggle.hover{border-color:#f59e0b}.tut-comic-edge-toggle.active{background:#704711;border-color:#f59e0b;color:#fff}
       .tut-comic-range{width:100%;min-width:0}.tut-comic-index{display:block;font-weight:700;color:#fff;background:#167d86;border-radius:4px;padding:4px 7px}
       .tut-comic-layer-help{color:#92979e;font-size:10px;line-height:1.45}.tut-comic-layer-list{display:flex;flex-direction:column;gap:5px}.tut-comic-layer-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:6px;background:#22262b;border:1px solid #444;border-radius:5px;padding:6px 7px;color:#ddd;cursor:pointer}.tut-comic-layer-row.active{border-color:#35d0c8;background:#164f55}.tut-comic-layer-rank{color:#8f979f;text-align:center;font-variant-numeric:tabular-nums}.tut-comic-layer-row.active .tut-comic-layer-rank{color:#fff}.tut-comic-layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.tut-comic-layer-actions .tut-comic-btn{width:100%}
       @media (max-width:900px){.tut-comic-workspace{grid-template-columns:minmax(0,1fr) 250px}}
@@ -104,20 +141,26 @@ function makeFields(fields, columns = 2) {
 function parseData(value) {
     const fallback = {
         version: 1,
-        panels: Array.from({ length: MAX_PANELS }, () => ({ focus_x: .5, focus_y: .5, zoom: 1, flip: false, overflow_top: false, overflow_bottom: false, overflow_left: false, overflow_right: false })),
+        panels: Array.from({ length: MAX_PANELS }, () => ({ focus_x: .5, focus_y: .5, zoom: 1, flip: false, open_edges: [false, false, false, false], overflow_top: false, overflow_bottom: false, overflow_left: false, overflow_right: false })),
         layout_overrides: {},
+        quad_overrides: {},
         layer_orders: {},
     };
     try {
         const parsed = JSON.parse(value || "{}");
         if (parsed?.version !== 1 || !Array.isArray(parsed.panels)) return fallback;
         parsed.panels.slice(0, MAX_PANELS).forEach((item, index) => {
+            const openEdges = Array.isArray(item?.open_edges) && item.open_edges.length === 4
+                ? item.open_edges.map((value) => value === true)
+                : [item?.overflow_top === true, item?.overflow_right === true, item?.overflow_bottom === true, item?.overflow_left === true];
             fallback.panels[index] = {
                 focus_x: clamp(item?.focus_x), focus_y: clamp(item?.focus_y),
                 zoom: clamp(item?.zoom ?? 1, .25, 4), flip: item?.flip === true,
+                open_edges: openEdges,
                 overflow_top: item?.overflow_top === true, overflow_bottom: item?.overflow_bottom === true,
                 overflow_left: item?.overflow_left === true, overflow_right: item?.overflow_right === true,
             };
+            syncLegacyEdges(fallback.panels[index]);
         });
         if (parsed.layout_overrides && typeof parsed.layout_overrides === "object") {
             for (const [name, rectangles] of Object.entries(parsed.layout_overrides)) {
@@ -132,10 +175,19 @@ function parseData(value) {
                 if (clean.every(Boolean)) fallback.layout_overrides[name] = clean;
             }
         }
+        if (parsed.quad_overrides && typeof parsed.quad_overrides === "object") {
+            for (const [name, quads] of Object.entries(parsed.quad_overrides)) {
+                if (!PANEL_LAYOUTS[name] || !Array.isArray(quads)) continue;
+                const expected = name === CUSTOM_LAYOUT ? [1, MAX_PANELS] : [PANEL_LAYOUTS[name].length, PANEL_LAYOUTS[name].length];
+                if (quads.length < expected[0] || quads.length > expected[1]) continue;
+                const clean = quads.map((quad) => Array.isArray(quad) ? quad.map((point) => Array.isArray(point) ? point.map((value) => clamp(value)) : null) : null);
+                if (clean.every((quad) => validQuad(quad))) fallback.quad_overrides[name] = clean;
+            }
+        }
         if (parsed.layer_orders && typeof parsed.layer_orders === "object") {
             for (const [name, order] of Object.entries(parsed.layer_orders)) {
                 if (!PANEL_LAYOUTS[name] || !Array.isArray(order)) continue;
-                const count = (fallback.layout_overrides[name] || PANEL_LAYOUTS[name]).length;
+                const count = (fallback.quad_overrides[name] || fallback.layout_overrides[name] || PANEL_LAYOUTS[name]).length;
                 if (order.length === count && order.every(Number.isInteger) && [...order].sort((a, b) => a - b).every((value, index) => value === index)) fallback.layer_orders[name] = [...order];
             }
         }
@@ -164,7 +216,7 @@ function installComicCanvas(node) {
     const priorStoreCallback = widgets.panel_data.callback;
     let data = parseData(widgets.panel_data.value);
     let selected = 0, mode = "frame", drawMode = false, previewImages = [];
-    let moving = null, resizing = null, drawing = null, snapGuides = [];
+    let moving = null, resizing = null, drawing = null, snapGuides = [], invalidQuad = null, hoveredEdge = -1, hoveredCanvasEdge = null;
     let snapEnabled = node.properties?.tutComicCanvasState?.snap_enabled !== false;
     let activeSidebar = node.properties?.tutComicCanvasState?.sidebar_tab || "camera";
 
@@ -214,15 +266,16 @@ function installComicCanvas(node) {
     const cameraRow = document.createElement("div"); cameraRow.className = "tut-comic-camera-row";
     cameraRow.append(document.createTextNode("缩放"), zoom, zoomValue);
     const cameraActions = document.createElement("div"); cameraActions.className = "tut-comic-actions"; cameraActions.append(flip, resetCamera);
+    const edgeHelp = document.createElement("span"); edgeHelp.className = "tut-comic-label"; edgeHelp.textContent = "逐边开放（按顶点顺序）";
     const edgeRow = document.createElement("div"); edgeRow.className = "tut-comic-edge-row";
-    edgeRow.append(document.createTextNode("开放边缘"));
-    const edgeChecks = {};
-    for (const [key, label, ariaLabel] of [["overflow_top", "上", "上边缘开放"], ["overflow_bottom", "下", "下边缘开放"], ["overflow_left", "左", "左边缘开放"], ["overflow_right", "右", "右边缘开放"]]) {
-        const toggle = document.createElement("label"); toggle.className = "tut-comic-edge-toggle";
-        const check = document.createElement("input"); check.type = "checkbox"; check.setAttribute("aria-label", ariaLabel);
-        toggle.append(check, document.createTextNode(label)); edgeChecks[key] = check; edgeRow.append(toggle);
-    }
-    settingsPanel.append(selectedLabel, cameraRow, cameraActions, edgeRow);
+    const edgeButtons = Array.from({ length: 4 }, (_, index) => {
+        const button = makeButton(EDGE_LABELS[index], `开放第 ${index + 1} 条边；初始方向依次为上、右、下、左`);
+        button.className = "tut-comic-edge-toggle"; button.dataset.edge = String(index);
+        button.addEventListener("mouseenter", () => { hoveredEdge = index; draw(); });
+        button.addEventListener("mouseleave", () => { hoveredEdge = -1; draw(); });
+        edgeRow.append(button); return button;
+    });
+    settingsPanel.append(selectedLabel, cameraRow, cameraActions, edgeHelp, edgeRow);
 
     const stylePanel = document.createElement("div"); stylePanel.className = "tut-comic-panel";
     stylePanel.innerHTML = "<h4>页面样式</h4>";
@@ -287,6 +340,12 @@ function installComicCanvas(node) {
                 if (next[2] - next[0] >= .005 && next[3] - next[1] >= .005) rectangles[index] = next;
             });
         }
+        for (const quads of Object.values(data.quad_overrides)) {
+            quads.forEach((quad, index) => {
+                const next = quad.map(([x, y]) => [mapX(x), mapY(y)]);
+                if (validQuad(next)) quads[index] = next;
+            });
+        }
     }
     function materializedTemplate(name = layoutName()) {
         if (name === CUSTOM_LAYOUT) return clone(PANEL_LAYOUTS[CUSTOM_LAYOUT]);
@@ -299,14 +358,17 @@ function installComicCanvas(node) {
             clamp((m + y1 * contentH - (y1 < 1 ? gap / 2 : 0)) / ch),
         ]);
     }
-    function rectangles() { return data.layout_overrides[layoutName()] || materializedTemplate(); }
-    function editableRectangles() {
+    function resolvedQuads(name = layoutName()) {
+        if (data.quad_overrides[name]) return data.quad_overrides[name];
+        return (data.layout_overrides[name] || materializedTemplate(name)).map(rectToQuad);
+    }
+    function editableQuads() {
         const name = layoutName();
-        if (!data.layout_overrides[name]) data.layout_overrides[name] = materializedTemplate(name);
-        return data.layout_overrides[name];
+        if (!data.quad_overrides[name]) data.quad_overrides[name] = resolvedQuads(name);
+        return data.quad_overrides[name];
     }
     function layerOrder(name = layoutName()) {
-        const count = (data.layout_overrides[name] || materializedTemplate(name)).length;
+        const count = resolvedQuads(name).length;
         const current = data.layer_orders[name];
         if (Array.isArray(current) && current.length === count && [...current].sort((a, b) => a - b).every((value, index) => value === index)) return current;
         delete data.layer_orders[name];
@@ -327,10 +389,11 @@ function installComicCanvas(node) {
         const [minX, minY, maxX, maxY] = pageBounds(), spanX = maxX - minX, spanY = maxY - minY;
         const xs = [minX, minX + spanX / 3, minX + spanX / 2, minX + spanX * 2 / 3, maxX];
         const ys = [minY, minY + spanY / 3, minY + spanY / 2, minY + spanY * 2 / 3, maxY];
-        rectangles().forEach((rect, otherIndex) => {
+        resolvedQuads().forEach((quad, otherIndex) => {
             if (otherIndex === index) return;
-            xs.push(rect[0], (rect[0] + rect[2]) / 2, rect[2]);
-            ys.push(rect[1], (rect[1] + rect[3]) / 2, rect[3]);
+            const [x0, y0, x1, y1] = quadBounds(quad);
+            xs.push(x0, (x0 + x1) / 2, x1, ...quad.map((point) => point[0]));
+            ys.push(y0, (y0 + y1) / 2, y1, ...quad.map((point) => point[1]));
         });
         return { xs: [...new Set(xs)], ys: [...new Set(ys)] };
     }
@@ -346,8 +409,9 @@ function installComicCanvas(node) {
         snapGuides = [];
         if (!snapEnabled) return { dx, dy };
         const bounds = overlay.getBoundingClientRect(), targets = alignmentTargets(index);
-        const xSnap = nearestSnap([source[0] + dx, (source[0] + source[2]) / 2 + dx, source[2] + dx], targets.xs, 10 / Math.max(1, bounds.width));
-        const ySnap = nearestSnap([source[1] + dy, (source[1] + source[3]) / 2 + dy, source[3] + dy], targets.ys, 10 / Math.max(1, bounds.height));
+        const [x0, y0, x1, y1] = quadBounds(source);
+        const xSnap = nearestSnap([x0 + dx, (x0 + x1) / 2 + dx, x1 + dx, ...source.map((point) => point[0] + dx)], targets.xs, 10 / Math.max(1, bounds.width));
+        const ySnap = nearestSnap([y0 + dy, (y0 + y1) / 2 + dy, y1 + dy, ...source.map((point) => point[1] + dy)], targets.ys, 10 / Math.max(1, bounds.height));
         if (xSnap) { dx += xSnap.delta; snapGuides.push({ axis: "x", value: xSnap.target }); }
         if (ySnap) { dy += ySnap.delta; snapGuides.push({ axis: "y", value: ySnap.target }); }
         return { dx, dy };
@@ -359,6 +423,45 @@ function installComicCanvas(node) {
         if (!snapped) return value;
         snapGuides.push({ axis, value: snapped.target }); return snapped.target;
     }
+    function edgeMotion(quad, edgeIndex) {
+        const bounds = overlay.getBoundingClientRect(), widthPx = Math.max(1, bounds.width), heightPx = Math.max(1, bounds.height);
+        const start = quad[edgeIndex], end = quad[(edgeIndex + 1) % 4];
+        const dx = (end[0] - start[0]) * widthPx, dy = (end[1] - start[1]) * heightPx;
+        const length = Math.max(1e-6, Math.hypot(dx, dy));
+        const screenQuad = quad.map(([x, y]) => [x * widthPx, y * heightPx]);
+        const sign = signedArea(screenQuad) >= 0 ? 1 : -1;
+        const normalX = sign * dy / length, normalY = -sign * dx / length;
+        return { normalX, normalY, moveX: normalX / widthPx, moveY: normalY / heightPx, widthPx, heightPx };
+    }
+    function quadInPage(quad) {
+        const [minX, minY, maxX, maxY] = pageBounds(), epsilon = 1e-9;
+        return quad.every(([x, y]) => x >= minX - epsilon && x <= maxX + epsilon && y >= minY - epsilon && y <= maxY + epsilon);
+    }
+    function snapEdgeMove(source, edgeIndex, scalar, index, motion) {
+        snapGuides = [];
+        if (!snapEnabled) return scalar;
+        const targets = alignmentTargets(index), nextIndex = (edgeIndex + 1) % 4;
+        const midpoint = [(source[edgeIndex][0] + source[nextIndex][0]) / 2, (source[edgeIndex][1] + source[nextIndex][1]) / 2];
+        const anchors = [source[edgeIndex], source[nextIndex], midpoint];
+        let best = null;
+        for (const [axis, values, step] of [["x", targets.xs, motion.moveX], ["y", targets.ys, motion.moveY]]) {
+            if (Math.abs(step) < 1e-9) continue;
+            const coordinate = axis === "x" ? 0 : 1;
+            for (const anchor of anchors) for (const target of values) {
+                const candidate = (target - anchor[coordinate]) / step;
+                const distance = Math.abs(candidate - scalar);
+                if (distance <= 10 && (!best || distance < best.distance)) best = { scalar: candidate, target, axis, distance };
+            }
+        }
+        if (!best) return scalar;
+        snapGuides.push({ axis: best.axis, value: best.target }); return best.scalar;
+    }
+    function edgeCursor(quad, edgeIndex) {
+        const { normalX, normalY } = edgeMotion(quad, edgeIndex);
+        if (Math.abs(normalX) > .9) return "ew-resize";
+        if (Math.abs(normalY) > .9) return "ns-resize";
+        return normalX * normalY >= 0 ? "nwse-resize" : "nesw-resize";
+    }
     function markDirty() { node.setDirtyCanvas?.(true, true); app.graph?.setDirtyCanvas?.(true, true); }
     function setWidget(name, value, notify = true) {
         const widget = widgets[name]; if (!widget || widget.value === value) return;
@@ -367,10 +470,11 @@ function installComicCanvas(node) {
         markDirty();
     }
     function writeData() {
+        data.panels.forEach(syncLegacyEdges);
         widgets.panel_data.value = JSON.stringify(data);
         priorStoreCallback?.call(widgets.panel_data, widgets.panel_data.value);
         node.properties = node.properties || {};
-        node.properties.tutComicCanvasState = { version: 2, panel_data: widgets.panel_data.value, snap_enabled: snapEnabled, sidebar_tab: activeSidebar, saved_at: Date.now() };
+        node.properties.tutComicCanvasState = { version: 3, panel_data: widgets.panel_data.value, snap_enabled: snapEnabled, sidebar_tab: activeSidebar, saved_at: Date.now() };
         markDirty(); draw();
     }
     function resizeCanvas() {
@@ -397,15 +501,31 @@ function installComicCanvas(node) {
         if (!previewImages.length || emptyFill.value === "留空") return null;
         return emptyFill.value === "循环填充" ? previewImages[index % previewImages.length] : previewImages[previewImages.length - 1];
     }
-    function drawPreview(image, x, y, w, h, panel) {
+    function pixelQuad(quad) { return quad.map(([x, y]) => [x * overlay.width, y * overlay.height]); }
+    function addQuadPath(context, points) {
+        context.moveTo(points[0][0], points[0][1]);
+        for (let index = 1; index < points.length; index++) context.lineTo(points[index][0], points[index][1]);
+        context.closePath();
+    }
+    function signedArea(points) {
+        return points.reduce((sum, point, index) => { const next = points[(index + 1) % points.length]; return sum + point[0] * next[1] - next[0] * point[1]; }, 0) / 2;
+    }
+    function edgeExtrusion(points, edgeIndex) {
+        const a = points[edgeIndex], b = points[(edgeIndex + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], length = Math.max(1, Math.hypot(dx, dy));
+        const sign = signedArea(points) >= 0 ? 1 : -1;
+        const nx = sign * dy / length, ny = -sign * dx / length, distance = Math.hypot(overlay.width, overlay.height) * 2;
+        return [a, b, [b[0] + nx * distance, b[1] + ny * distance], [a[0] + nx * distance, a[1] + ny * distance]];
+    }
+    function drawPreview(image, quad, panel) {
         if (!image?.complete || !image.naturalWidth) return false;
+        const points = pixelQuad(quad), [x0, y0, x1, y1] = quadBounds(points), x = x0, y = y0, w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
         const contain = fitMode.value === "完整显示";
         const scale = (contain ? Math.min(w / image.naturalWidth, h / image.naturalHeight) : Math.max(w / image.naturalWidth, h / image.naturalHeight)) * panel.zoom;
         const drawW = Math.max(1, image.naturalWidth * scale), drawH = Math.max(1, image.naturalHeight * scale);
         const drawX = x + (w - drawW) * panel.focus_x, drawY = y + (h - drawH) * panel.focus_y;
-        const clipX = panel.overflow_left ? 0 : x, clipY = panel.overflow_top ? 0 : y;
-        const clipRight = panel.overflow_right ? overlay.width : x + w, clipBottom = panel.overflow_bottom ? overlay.height : y + h;
-        ctx.save(); ctx.beginPath(); ctx.rect(clipX, clipY, Math.max(0, clipRight - clipX), Math.max(0, clipBottom - clipY)); ctx.clip();
+        ctx.save(); ctx.beginPath(); addQuadPath(ctx, points);
+        panel.open_edges.forEach((open, index) => { if (open) addQuadPath(ctx, edgeExtrusion(points, index)); });
+        ctx.clip("nonzero");
         if (panel.flip) { ctx.translate(x * 2 + w, 0); ctx.scale(-1, 1); ctx.drawImage(image, drawX, drawY, drawW, drawH); }
         else ctx.drawImage(image, drawX, drawY, drawW, drawH);
         ctx.restore(); return true;
@@ -438,36 +558,53 @@ function installComicCanvas(node) {
         resizeCanvas();
         bgCtx.clearRect(0, 0, bg.width, bg.height); bgCtx.fillStyle = backgroundColor.value || "#ffffff"; bgCtx.fillRect(0, 0, bg.width, bg.height); drawGrid();
         ctx.clearRect(0, 0, overlay.width, overlay.height);
-        const rects = rectangles(); selected = Math.max(0, Math.min(selected, rects.length - 1));
+        const quads = resolvedQuads(); selected = Math.max(0, Math.min(selected, quads.length - 1));
         const displayWidth = Math.max(1, overlay.getBoundingClientRect().width);
         const uiScale = overlay.width / displayWidth;
         const [previewCanvasWidth] = canvasSize();
         const frameStroke = Math.max(0, Number(borderWidth.value) || 0) * overlay.width / previewCanvasWidth;
-        const geometry = rects.map((rect) => {
-            const [x0, y0, x1, y1] = rect, x = x0 * overlay.width, y = y0 * overlay.height, w = (x1 - x0) * overlay.width, h = (y1 - y0) * overlay.height;
-            const stroke = Math.min(frameStroke, Math.max(0, Math.min(w, h) / 2 - 1));
-            return { x, y, w, h, stroke, innerX: x + stroke, innerY: y + stroke, innerW: Math.max(1, w - stroke * 2), innerH: Math.max(1, h - stroke * 2) };
-        });
-        geometry.forEach(({ x, y, w, h, stroke }) => {
-            if (stroke > 0) { ctx.fillStyle = borderColor.value || "#111111"; ctx.fillRect(x, y, w, h); }
-        });
         for (const index of layerOrder()) {
-            const { innerX, innerY, innerW, innerH } = geometry[index];
-            const panel = data.panels[index], hasPreview = drawPreview(previewFor(index), innerX, innerY, innerW, innerH, panel);
-            ctx.save(); ctx.fillStyle = hasPreview ? (index === selected ? "rgba(26,118,150,.10)" : "rgba(0,0,0,.04)") : (index === selected ? "rgba(26,118,150,.52)" : "rgba(33,39,47,.82)"); ctx.fillRect(innerX, innerY, innerW, innerH);
-            ctx.restore();
+            const quad = quads[index], points = pixelQuad(quad), panel = data.panels[index];
+            const hasPreview = drawPreview(previewFor(index), quad, panel);
+            ctx.save(); ctx.beginPath(); addQuadPath(ctx, points); ctx.clip();
+            ctx.fillStyle = hasPreview ? (index === selected ? "rgba(26,118,150,.10)" : "rgba(0,0,0,.04)") : (index === selected ? "rgba(26,118,150,.52)" : "rgba(33,39,47,.82)");
+            ctx.fillRect(0, 0, overlay.width, overlay.height); ctx.restore();
+            if (frameStroke > 0) {
+                ctx.save(); ctx.strokeStyle = borderColor.value || "#111111"; ctx.lineWidth = frameStroke * 2; ctx.lineJoin = "miter";
+                for (let edge = 0; edge < 4; edge++) if (!panel.open_edges[edge]) {
+                    const a = points[edge], b = points[(edge + 1) % 4]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+                }
+                ctx.restore();
+            }
         }
-        geometry.forEach(({ x, y, w, h }, index) => {
-            if (index === selected) { ctx.strokeStyle = "#35d0c8"; ctx.lineWidth = 2 * uiScale; ctx.strokeRect(x, y, w, h); }
+        quads.forEach((quad, index) => {
+            const points = pixelQuad(quad), [x, y] = quadBounds(points), panel = data.panels[index];
+            if (index === selected) { ctx.save(); ctx.strokeStyle = "#35d0c8"; ctx.lineWidth = 2 * uiScale; ctx.beginPath(); addQuadPath(ctx, points); ctx.stroke(); ctx.restore(); }
+            panel.open_edges.forEach((open, edge) => {
+                if (!open && !(index === selected && hoveredEdge === edge)) return;
+                const a = points[edge], b = points[(edge + 1) % 4], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+                ctx.save(); ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = (open ? 3 : 2) * uiScale; ctx.setLineDash([7 * uiScale, 5 * uiScale]); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); ctx.setLineDash([]);
+                const motion = edgeMotion(quad, edge), labelX = mx + motion.normalX * 13 * uiScale, labelY = my + motion.normalY * 13 * uiScale;
+                const radius = 8 * uiScale; ctx.fillStyle = "#f59e0b"; ctx.beginPath(); ctx.arc(labelX, labelY, radius, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#171717"; ctx.font = `bold ${10 * uiScale}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(edge + 1), labelX, labelY); ctx.restore();
+            });
             const badgeX = x + 4 * uiScale, badgeY = y + 4 * uiScale, badgeW = 24 * uiScale, badgeH = 18 * uiScale;
             ctx.fillStyle = index === selected ? "#00aeb8" : "#137b80"; ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
             ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.lineWidth = 2 * uiScale; ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
             ctx.fillStyle = "#fff"; ctx.font = `bold ${12 * uiScale}px sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "center"; ctx.fillText(String(index + 1), badgeX + badgeW / 2, badgeY + badgeH / 2);
             if (index === selected && mode === "frame") {
                 ctx.fillStyle = "#fff"; const handle = 5 * uiScale;
-                for (const [hx, hy] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) { ctx.fillRect(hx - handle, hy - handle, handle * 2, handle * 2); ctx.strokeStyle = "#167d86"; ctx.lineWidth = 3 * uiScale; ctx.strokeRect(hx - handle, hy - handle, handle * 2, handle * 2); }
+                for (const [hx, hy] of points) { ctx.fillRect(hx - handle, hy - handle, handle * 2, handle * 2); ctx.strokeStyle = "#167d86"; ctx.lineWidth = 2 * uiScale; ctx.strokeRect(hx - handle, hy - handle, handle * 2, handle * 2); }
+                for (let edge = 0; edge < 4; edge++) {
+                    const a = points[edge], b = points[(edge + 1) % 4], dx = b[0] - a[0], dy = b[1] - a[1], length = Math.max(1, Math.hypot(dx, dy));
+                    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, half = 8 * uiScale;
+                    const tx = dx / length * half, ty = dy / length * half;
+                    const active = (hoveredCanvasEdge?.index === index && hoveredCanvasEdge?.edge === edge) || resizing?.edge === edge;
+                    ctx.save(); ctx.lineCap = "round"; ctx.strokeStyle = "rgba(15,23,28,.9)"; ctx.lineWidth = 7 * uiScale; ctx.beginPath(); ctx.moveTo(mx - tx, my - ty); ctx.lineTo(mx + tx, my + ty); ctx.stroke();
+                    ctx.strokeStyle = active ? "#35d0c8" : "#f4f7f8"; ctx.lineWidth = 3 * uiScale; ctx.beginPath(); ctx.moveTo(mx - tx, my - ty); ctx.lineTo(mx + tx, my + ty); ctx.stroke(); ctx.restore();
+                }
             }
         });
+        if (invalidQuad) { ctx.save(); ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 3 * uiScale; ctx.setLineDash([7 * uiScale, 5 * uiScale]); ctx.beginPath(); addQuadPath(ctx, pixelQuad(invalidQuad)); ctx.stroke(); ctx.restore(); }
         if (snapGuides.length) {
             ctx.save(); ctx.strokeStyle = "#ff4fc8"; ctx.lineWidth = 2 * uiScale; ctx.setLineDash([6 * uiScale, 5 * uiScale]);
             for (const guide of snapGuides) {
@@ -483,27 +620,40 @@ function installComicCanvas(node) {
             const w = Math.abs(drawing.x1 - drawing.x0) * overlay.width, h = Math.abs(drawing.y1 - drawing.y0) * overlay.height;
             ctx.fillStyle = "rgba(53,208,200,.18)"; ctx.fillRect(x, y, w, h); ctx.strokeStyle = "#35d0c8"; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
         }
-        const rect = rects[selected], panel = data.panels[selected];
-        selectedLabel.textContent = `画格 ${selected + 1} / ${rects.length}`;
+        const panel = data.panels[selected];
+        selectedLabel.textContent = `画格 ${selected + 1} / ${quads.length}`;
         zoom.value = String(panel.zoom); zoomValue.textContent = `${panel.zoom.toFixed(2)}×`; flip.classList.toggle("active", panel.flip);
-        for (const [key, check] of Object.entries(edgeChecks)) check.checked = panel[key] === true;
+        edgeButtons.forEach((button, index) => { button.classList.toggle("active", panel.open_edges[index]); button.classList.toggle("hover", hoveredEdge === index); button.setAttribute("aria-pressed", String(panel.open_edges[index])); });
         frameBtn.classList.toggle("active", mode === "frame" && !drawMode); cameraBtn.classList.toggle("active", mode === "camera"); drawBtn.classList.toggle("active", drawMode);
-        overlay.style.cursor = drawMode ? "crosshair" : mode === "camera" ? (moving?.camera ? "grabbing" : "grab") : "move";
-        const free = layout.value === CUSTOM_LAYOUT; drawBtn.disabled = !free || rects.length >= MAX_PANELS; deleteBtn.disabled = !free || rects.length <= 1;
-        renderLayerList(rects);
+        overlay.style.cursor = drawMode ? "crosshair" : mode === "camera" ? (moving?.camera ? "grabbing" : "grab")
+            : resizing?.edge !== undefined ? edgeCursor(resizing.quad, resizing.edge)
+            : hoveredCanvasEdge ? edgeCursor(quads[hoveredCanvasEdge.index], hoveredCanvasEdge.edge) : "move";
+        const free = layout.value === CUSTOM_LAYOUT; drawBtn.disabled = !free || quads.length >= MAX_PANELS; deleteBtn.disabled = !free || quads.length <= 1;
+        renderLayerList(quads);
     }
     function point(event) {
         const bounds = overlay.getBoundingClientRect();
         return { x: clamp((event.clientX - bounds.left) / Math.max(1, bounds.width)), y: clamp((event.clientY - bounds.top) / Math.max(1, bounds.height)) };
     }
     function hitTest(p) {
-        const rects = rectangles(), bx = 16 / Math.max(1, overlay.getBoundingClientRect().width), by = 16 / Math.max(1, overlay.getBoundingClientRect().height);
-        for (const index of [...layerOrder()].reverse()) {
-            const [x0, y0, x1, y1] = rects[index];
-            for (const [handle, hx, hy] of [["nw", x0, y0], ["ne", x1, y0], ["sw", x0, y1], ["se", x1, y1]]) {
-                if (Math.abs(p.x - hx) <= bx && Math.abs(p.y - hy) <= by) return { index, handle };
+        const quads = resolvedQuads(), bounds = overlay.getBoundingClientRect();
+        const vertexBx = 10 / Math.max(1, bounds.width), vertexBy = 10 / Math.max(1, bounds.height);
+        const edgeBx = 12 / Math.max(1, bounds.width), edgeBy = 12 / Math.max(1, bounds.height);
+        if (mode === "frame" && quads[selected]) {
+            const selectedQuad = quads[selected];
+            for (let vertex = 0; vertex < 4; vertex++) {
+                const [hx, hy] = selectedQuad[vertex];
+                if (Math.abs(p.x - hx) <= vertexBx && Math.abs(p.y - hy) <= vertexBy) return { index: selected, handle: "vertex", vertex };
             }
-            if (p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1) return { index, handle: "move" };
+            for (let edge = 0; edge < 4; edge++) {
+                const start = selectedQuad[edge], end = selectedQuad[(edge + 1) % 4];
+                const mx = (start[0] + end[0]) / 2, my = (start[1] + end[1]) / 2;
+                if (Math.abs(p.x - mx) <= edgeBx && Math.abs(p.y - my) <= edgeBy) return { index: selected, handle: "edge", edge };
+            }
+        }
+        for (const index of [...layerOrder()].reverse()) {
+            const quad = quads[index];
+            if (pointInQuad(p, quad)) return { index, handle: "move" };
         }
         return null;
     }
@@ -515,52 +665,71 @@ function installComicCanvas(node) {
         if (mode === "camera") {
             const panel = data.panels[selected];
             moving = { camera: true, start: p, focus_x: panel.focus_x, focus_y: panel.focus_y };
-        } else if (hit.handle === "move") moving = { start: p, rect: clone(rectangles()[selected]) };
-        else resizing = { handle: hit.handle, rect: clone(rectangles()[selected]) };
-        editableRectangles(); draw();
+        } else if (hit.handle === "move") moving = { start: p, quad: clone(resolvedQuads()[selected]) };
+        else if (hit.handle === "edge") {
+            const quad = clone(resolvedQuads()[selected]); resizing = { edge: hit.edge, start: p, quad, motion: edgeMotion(quad, hit.edge) };
+        } else resizing = { vertex: hit.vertex, quad: clone(resolvedQuads()[selected]) };
+        editableQuads(); draw();
     });
     overlay.addEventListener("pointermove", (event) => {
         const p = point(event);
+        if (!drawing && !moving && !resizing) {
+            const hit = hitTest(p), nextHover = hit?.handle === "edge" ? { index: hit.index, edge: hit.edge } : null;
+            const changed = nextHover?.index !== hoveredCanvasEdge?.index || nextHover?.edge !== hoveredCanvasEdge?.edge;
+            hoveredCanvasEdge = nextHover; if (changed) draw(); return;
+        }
         if (drawing) { snapGuides = []; const bounded = pointInPage(p); drawing.x1 = bounded.x; drawing.y1 = bounded.y; draw(); return; }
         if (moving?.camera) {
             snapGuides = [];
-            const rect = rectangles()[selected], panel = data.panels[selected];
-            panel.focus_x = clamp(moving.focus_x - (p.x - moving.start.x) / Math.max(.001, rect[2] - rect[0]));
-            panel.focus_y = clamp(moving.focus_y - (p.y - moving.start.y) / Math.max(.001, rect[3] - rect[1]));
+            const [x0, y0, x1, y1] = quadBounds(resolvedQuads()[selected]), panel = data.panels[selected];
+            panel.focus_x = clamp(moving.focus_x - (p.x - moving.start.x) / Math.max(.001, x1 - x0));
+            panel.focus_y = clamp(moving.focus_y - (p.y - moving.start.y) / Math.max(.001, y1 - y0));
             draw(); return;
         }
         if (moving) {
-            const source = moving.rect, [minX, minY, maxX, maxY] = pageBounds();
-            let dx = Math.max(minX - source[0], Math.min(maxX - source[2], p.x - moving.start.x));
-            let dy = Math.max(minY - source[1], Math.min(maxY - source[3], p.y - moving.start.y));
+            const source = moving.quad, [sx0, sy0, sx1, sy1] = quadBounds(source), [minX, minY, maxX, maxY] = pageBounds();
+            let dx = Math.max(minX - sx0, Math.min(maxX - sx1, p.x - moving.start.x));
+            let dy = Math.max(minY - sy0, Math.min(maxY - sy1, p.y - moving.start.y));
             ({ dx, dy } = snapMove(source, dx, dy, selected));
-            dx = Math.max(minX - source[0], Math.min(maxX - source[2], dx));
-            dy = Math.max(minY - source[1], Math.min(maxY - source[3], dy));
-            editableRectangles()[selected] = [source[0] + dx, source[1] + dy, source[2] + dx, source[3] + dy]; draw(); return;
+            dx = Math.max(minX - sx0, Math.min(maxX - sx1, dx));
+            dy = Math.max(minY - sy0, Math.min(maxY - sy1, dy));
+            editableQuads()[selected] = source.map(([x, y]) => [x + dx, y + dy]); draw(); return;
         }
         if (resizing) {
-            const next = clone(resizing.rect), minW = .025, minH = .025, [minX, minY, maxX, maxY] = pageBounds();
             snapGuides = [];
-            if (resizing.handle.includes("w")) next[0] = Math.max(minX, Math.min(next[2] - minW, snapCoordinate(p.x, "x", selected)));
-            if (resizing.handle.includes("e")) next[2] = Math.min(maxX, Math.max(next[0] + minW, snapCoordinate(p.x, "x", selected)));
-            if (resizing.handle.includes("n")) next[1] = Math.max(minY, Math.min(next[3] - minH, snapCoordinate(p.y, "y", selected)));
-            if (resizing.handle.includes("s")) next[3] = Math.min(maxY, Math.max(next[1] + minH, snapCoordinate(p.y, "y", selected)));
-            editableRectangles()[selected] = next.map((value) => clamp(value)); draw();
+            const next = clone(resizing.quad);
+            if (resizing.edge !== undefined) {
+                const deltaX = (p.x - resizing.start.x) * resizing.motion.widthPx;
+                const deltaY = (p.y - resizing.start.y) * resizing.motion.heightPx;
+                let scalar = deltaX * resizing.motion.normalX + deltaY * resizing.motion.normalY;
+                scalar = snapEdgeMove(resizing.quad, resizing.edge, scalar, selected, resizing.motion);
+                const dx = resizing.motion.moveX * scalar, dy = resizing.motion.moveY * scalar;
+                for (const vertex of [resizing.edge, (resizing.edge + 1) % 4]) {
+                    next[vertex] = [resizing.quad[vertex][0] + dx, resizing.quad[vertex][1] + dy];
+                }
+            } else {
+                const [minX, minY, maxX, maxY] = pageBounds();
+                next[resizing.vertex] = [clamp(snapCoordinate(p.x, "x", selected), minX, maxX), clamp(snapCoordinate(p.y, "y", selected), minY, maxY)];
+            }
+            if (validQuad(next) && quadInPage(next)) { editableQuads()[selected] = next; invalidQuad = null; } else invalidQuad = next;
+            draw();
         }
     });
     const finishPointer = (event) => {
         if (drawing) {
             const rect = [Math.min(drawing.x0, drawing.x1), Math.min(drawing.y0, drawing.y1), Math.max(drawing.x0, drawing.x1), Math.max(drawing.y0, drawing.y1)];
-            if (rect[2] - rect[0] >= .025 && rect[3] - rect[1] >= .025 && rectangles().length < MAX_PANELS) {
-                const name = layoutName(), order = [...layerOrder(name)], editable = editableRectangles(); editable.push(rect); selected = editable.length - 1; order.push(selected); data.layer_orders[name] = order;
+            if (rect[2] - rect[0] >= .025 && rect[3] - rect[1] >= .025 && resolvedQuads().length < MAX_PANELS) {
+                const name = layoutName(), order = [...layerOrder(name)], editable = editableQuads(); editable.push(rectToQuad(rect)); selected = editable.length - 1; order.push(selected); data.layer_orders[name] = order;
             }
             drawing = null; drawMode = false;
         }
-        if (moving || resizing) { moving = null; resizing = null; }
+        if (moving || resizing) { moving = null; resizing = null; invalidQuad = null; }
+        hoveredCanvasEdge = null;
         snapGuides = [];
         writeData(); overlay.releasePointerCapture?.(event.pointerId);
     };
     overlay.addEventListener("pointerup", finishPointer); overlay.addEventListener("pointercancel", finishPointer);
+    overlay.addEventListener("pointerleave", () => { if (!moving && !resizing && !drawing && hoveredCanvasEdge) { hoveredCanvasEdge = null; draw(); } });
     overlay.addEventListener("wheel", (event) => {
         if (mode !== "camera") return;
         const hit = hitTest(point(event)); if (!hit) return;
@@ -573,8 +742,10 @@ function installComicCanvas(node) {
     }, { passive: false });
 
     function commitCanvasSize() {
+        const oldW = Math.max(64, Number(widgets.canvas_width.value) || 1024), oldH = Math.max(64, Number(widgets.canvas_height.value) || 1536);
         const w = Math.max(64, Math.min(8192, Math.round(Number(width.value) || 1024))), h = Math.max(64, Math.min(8192, Math.round(Number(height.value) || 1536)));
         width.value = String(w); height.value = String(h);
+        if (w !== oldW || h !== oldH) remapOverrides(boundsFor(oldW, oldH, margin.value), boundsFor(w, h, margin.value));
         const preset = SIZE_PRESETS.find((item) => item[1] === w && item[2] === h);
         sizePreset.value = preset ? preset[0] : "自定义";
         setWidget("canvas_width", w); setWidget("canvas_height", h); draw();
@@ -583,12 +754,12 @@ function installComicCanvas(node) {
     layerTop.addEventListener("click", () => moveSelectedLayer("top")); layerUp.addEventListener("click", () => moveSelectedLayer("up"));
     layerDown.addEventListener("click", () => moveSelectedLayer("down")); layerBottom.addEventListener("click", () => moveSelectedLayer("bottom"));
     layerReset.addEventListener("click", () => { delete data.layer_orders[layoutName()]; writeData(); });
-    layout.addEventListener("change", () => { setWidget("layout", layout.value); selected = 0; drawMode = false; if (layout.value === CUSTOM_LAYOUT) editableRectangles(); writeData(); });
+    layout.addEventListener("change", () => { setWidget("layout", layout.value); selected = 0; drawMode = false; writeData(); });
     frameBtn.addEventListener("click", () => { mode = "frame"; drawMode = false; snapGuides = []; draw(); });
     cameraBtn.addEventListener("click", () => { mode = "camera"; drawMode = false; snapGuides = []; draw(); });
     drawBtn.addEventListener("click", () => { if (!drawBtn.disabled) { mode = "frame"; drawMode = !drawMode; draw(); } });
-    deleteBtn.addEventListener("click", () => { if (!deleteBtn.disabled) { const name = layoutName(), removed = selected, order = layerOrder(name).filter((index) => index !== removed).map((index) => index > removed ? index - 1 : index); editableRectangles().splice(removed, 1); data.layer_orders[name] = order; selected = Math.max(0, removed - 1); writeData(); } });
-    resetBtn.addEventListener("click", () => { if (layoutName() === CUSTOM_LAYOUT) { data.layout_overrides[CUSTOM_LAYOUT] = clone(PANEL_LAYOUTS[CUSTOM_LAYOUT]); delete data.layer_orders[CUSTOM_LAYOUT]; } else delete data.layout_overrides[layoutName()]; selected = 0; writeData(); });
+    deleteBtn.addEventListener("click", () => { if (!deleteBtn.disabled) { const name = layoutName(), removed = selected, order = layerOrder(name).filter((index) => index !== removed).map((index) => index > removed ? index - 1 : index); editableQuads().splice(removed, 1); data.layer_orders[name] = order; selected = Math.max(0, removed - 1); writeData(); } });
+    resetBtn.addEventListener("click", () => { const name = layoutName(); delete data.quad_overrides[name]; delete data.layout_overrides[name]; delete data.layer_orders[name]; if (name === CUSTOM_LAYOUT) data.layout_overrides[name] = clone(PANEL_LAYOUTS[name]); selected = 0; writeData(); });
     snapCheck.addEventListener("change", () => { snapEnabled = snapCheck.checked; snapGuides = []; writeData(); });
     gridCheck.addEventListener("change", draw);
     sizePreset.addEventListener("change", () => { const found = SIZE_PRESETS.find((item) => item[0] === sizePreset.value); if (found) { width.value = String(found[1]); height.value = String(found[2]); commitCanvasSize(); } });
@@ -607,16 +778,20 @@ function installComicCanvas(node) {
     zoom.addEventListener("input", () => { data.panels[selected].zoom = Number(zoom.value); writeData(); });
     flip.addEventListener("click", () => { data.panels[selected].flip = !data.panels[selected].flip; writeData(); });
     resetCamera.addEventListener("click", () => { Object.assign(data.panels[selected], { focus_x: .5, focus_y: .5, zoom: 1, flip: false }); writeData(); });
-    for (const [key, check] of Object.entries(edgeChecks)) check.addEventListener("change", () => { data.panels[selected][key] = check.checked; writeData(); });
+    edgeButtons.forEach((button, index) => button.addEventListener("click", () => { data.panels[selected].open_edges[index] = !data.panels[selected].open_edges[index]; syncLegacyEdges(data.panels[selected]); writeData(); }));
 
     layout.value = widgets.layout.value || AUTO_LAYOUT; width.value = String(widgets.canvas_width.value); height.value = String(widgets.canvas_height.value);
     margin.value = String(widgets.page_margin.value); gutter.value = String(widgets.gutter.value); borderWidth.value = String(widgets.border_width.value);
     borderColor.value = widgets.border_color.value || "#111111"; backgroundColor.value = widgets.background_color.value || "#ffffff";
     fitMode.value = widgets.fit_mode.value; emptyFill.value = widgets.empty_fill.value; commitCanvasSize();
-    widgets.panel_data.callback = function (...args) { const result = priorStoreCallback?.apply(this, args); data = parseData(widgets.panel_data.value); selected = Math.min(selected, rectangles().length - 1); draw(); return result; };
+    widgets.panel_data.callback = function (...args) { const result = priorStoreCallback?.apply(this, args); data = parseData(widgets.panel_data.value); selected = Math.min(selected, resolvedQuads().length - 1); draw(); return result; };
     const domWidget = node.addDOMWidget("tut_comic_canvas_v2", "TUT_COMIC_CANVAS_V2", root, { serialize: false, hideOnZoom: false });
     domWidget.computeSize = (nodeWidth) => [nodeWidth, 900];
     node.__tutComicCanvasV2 = true;
+    const resizeObserver = new ResizeObserver(() => { if (monitor.isConnected) requestAnimationFrame(draw); });
+    resizeObserver.observe(monitor);
+    const priorRemoved = node.onRemoved;
+    node.onRemoved = function (...args) { resizeObserver.disconnect(); return priorRemoved?.apply(this, args); };
     const ensureDefaultSize = () => node.setSize?.([Math.max(node.size?.[0] || 0, 1100), Math.max(node.size?.[1] || 0, 1040)]);
     ensureDefaultSize();
     requestAnimationFrame(() => { ensureDefaultSize(); draw(); setTimeout(() => { ensureDefaultSize(); draw(); }, 100); setTimeout(() => { ensureDefaultSize(); draw(); }, 350); });

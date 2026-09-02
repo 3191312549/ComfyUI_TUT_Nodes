@@ -1,0 +1,2 @@
+"""Audio node group."""
+

@@ -18,6 +18,8 @@ IMAGE_COMIC = f"{IMAGE}/漫画"
 VIDEO = f"{ROOT}/视频"
 VIDEO_ANIMATION = f"{VIDEO}/动画"
 
+AUDIO = f"{ROOT}/音频"
+
 TOOLS = f"{ROOT}/工具"
 TOOLS_FILE = f"{TOOLS}/文件"
 TOOLS_TEXT = f"{TOOLS}/文本"
@@ -30,3 +32,7 @@ MODEL_LORA = f"{MODEL}/LoRA"
 
 LATENT = f"{ROOT}/潜空间"
 LATENT_UPSCALING = f"{LATENT}/放大"
+
+PENDING = f"{ROOT}/待测试"
+PENDING_IMAGE = f"{PENDING}/图片"
+PENDING_IMAGE_COMIC = f"{PENDING_IMAGE}/漫画"

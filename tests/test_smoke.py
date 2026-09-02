@@ -8,6 +8,7 @@ from PIL import Image
 
 from ComfyUI_TUT_Nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 from ComfyUI_TUT_Nodes.categories import (
+    AUDIO,
     IMAGE,
     IMAGE_ANIMATION,
     IMAGE_COLOR,
@@ -18,6 +19,7 @@ from ComfyUI_TUT_Nodes.categories import (
     IMAGE_TEXT,
     LATENT_UPSCALING,
     MODEL_LORA,
+    PENDING_IMAGE_COMIC,
     TOOLS_BATCH,
     TOOLS_EXCEL,
     TOOLS_WORKFLOW,
@@ -68,6 +70,8 @@ EXPECTED_NODE_IDS = {
     "TUT_GIMMVFIInterpolate",
     "TUT_ImageToBatch",
     "TUT_ComicPanelCanvas",
+    "TUT_ComicSpeechBubble",
+    "TUT_AdvancedAudioLoader",
     "TUT_SesquiLatentUpscale",
     "TUT_LoraStrengthTester",
 }
@@ -100,6 +104,12 @@ class TUTNodesSmokeTests(unittest.TestCase):
                 continue
             if node_id == "TUT_ComicPanelCanvas":
                 self.assertEqual(node_class.CATEGORY, IMAGE_COMIC)
+                continue
+            if node_id == "TUT_ComicSpeechBubble":
+                self.assertEqual(node_class.CATEGORY, PENDING_IMAGE_COMIC)
+                continue
+            if node_id == "TUT_AdvancedAudioLoader":
+                self.assertEqual(node_class.CATEGORY, AUDIO)
                 continue
             if node_id == "TUT_SesquiLatentUpscale":
                 self.assertEqual(node_class.CATEGORY, LATENT_UPSCALING)
