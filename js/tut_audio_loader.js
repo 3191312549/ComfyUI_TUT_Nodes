@@ -103,11 +103,16 @@ function installAudioEditor(node) {
         });
         return button;
     };
+    const uploadButton = makeButton("选择音频文件");
     const playButton = makeButton("播放");
     const stopButton = makeButton("停止");
     const resetButton = makeButton("重置全长");
-    controls.append(playButton, stopButton, resetButton);
-    container.append(canvas, controls);
+    const uploadInput = document.createElement("input");
+    uploadInput.type = "file";
+    uploadInput.accept = "audio/*,.wav,.mp3,.flac,.ogg,.oga,.m4a,.aac,.opus";
+    uploadInput.hidden = true;
+    controls.append(uploadButton, playButton, stopButton, resetButton);
+    container.append(canvas, controls, uploadInput);
 
     const context = canvas.getContext("2d");
     const state = {
@@ -137,6 +142,54 @@ function installAudioEditor(node) {
         node.setDirtyCanvas?.(true, true);
         app.graph?.setDirtyCanvas?.(true, true);
         draw();
+    }
+
+    function selectUploadedFile(value) {
+        const previous = fileWidget.value;
+        if (previous === value) {
+            void loadSelectedFile(true);
+            return;
+        }
+        app.graph?.beforeChange?.();
+        try {
+            fileWidget.value = value;
+            const values = fileWidget.options?.values;
+            if (Array.isArray(values) && !values.includes(value)) values.push(value);
+            fileWidget.callback?.(value, app.canvas, node);
+            node.onWidgetChanged?.(fileWidget.name, value, previous, fileWidget);
+            node.setDirtyCanvas?.(true, true);
+            app.graph?.setDirtyCanvas?.(true, true);
+        } finally {
+            app.graph?.afterChange?.();
+        }
+    }
+
+    async function uploadAudioFile(file) {
+        if (!file || state.disposed) return;
+        uploadButton.disabled = true;
+        uploadButton.textContent = "正在加入…";
+        state.message = "正在上传音频…";
+        markDirty();
+        try {
+            const body = new FormData();
+            body.append("image", file);
+            body.append("type", "input");
+            const response = await api.fetchApi("/upload/image", { method: "POST", body });
+            if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+            const result = await response.json();
+            const filename = String(result?.name || "");
+            if (!filename) throw new Error("服务器未返回文件名");
+            const subfolder = String(result?.subfolder || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+            selectUploadedFile(subfolder ? `${subfolder}/${filename}` : filename);
+        } catch (error) {
+            console.warn("TUT 高级音频加载：音频上传失败", error);
+            state.message = `音频上传失败：${error?.message || error}`;
+            markDirty();
+        } finally {
+            uploadButton.disabled = false;
+            uploadButton.textContent = "选择音频文件";
+            uploadInput.value = "";
+        }
     }
 
     function cancelProgressAnimation() {
@@ -522,6 +575,8 @@ function installAudioEditor(node) {
         markDirty();
     };
     const stopClick = () => stopPreview(true);
+    const chooseFile = () => uploadInput.click();
+    const uploadSelection = () => void uploadAudioFile(uploadInput.files?.[0]);
 
     const wrapWidgetCallback = (widget, callback) => {
         const previous = widget.callback;
@@ -547,6 +602,8 @@ function installAudioEditor(node) {
     playButton.addEventListener("click", togglePlay);
     stopButton.addEventListener("click", stopClick);
     resetButton.addEventListener("click", resetSelection);
+    uploadButton.addEventListener("click", chooseFile);
+    uploadInput.addEventListener("change", uploadSelection);
     const resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(draw) : null;
     resizeObserver?.observe(canvas);
 
@@ -571,6 +628,8 @@ function installAudioEditor(node) {
         playButton.removeEventListener("click", togglePlay);
         stopButton.removeEventListener("click", stopClick);
         resetButton.removeEventListener("click", resetSelection);
+        uploadButton.removeEventListener("click", chooseFile);
+        uploadInput.removeEventListener("change", uploadSelection);
         restoreCallbacks.forEach((restore) => restore());
     };
 

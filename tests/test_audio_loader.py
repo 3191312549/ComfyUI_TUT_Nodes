@@ -51,6 +51,10 @@ class AdvancedAudioLoaderTests(unittest.TestCase):
         for marker in (
             "TUT_AdvancedAudioLoader",
             "const MIN_WIDTH = 520",
+            "选择音频文件",
+            'uploadInput.accept = "audio/*',
+            'api.fetchApi("/upload/image"',
+            "selectUploadedFile",
             "播放",
             "停止",
             "重置全长",
