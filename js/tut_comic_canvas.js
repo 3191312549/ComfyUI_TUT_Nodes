@@ -3,7 +3,8 @@ import { api } from "/scripts/api.js";
 
 const AUTO_LAYOUT = "自动匹配数量";
 const CUSTOM_LAYOUT = "自由画框";
-const MAX_PANELS = 6;
+const MAX_PANELS = 20;
+const AUTO_MAX_PANELS = 6;
 const PANEL_LAYOUTS = {
     "整页单格": [[0, 0, 1, 1]],
     "左右双格": [[0, 0, .5, 1], [.5, 0, 1, 1]],
@@ -83,12 +84,15 @@ function ensureStyle() {
     const style = document.createElement("style");
     style.id = "tut-comic-canvas-v2-style";
     style.textContent = `
-      .tut-comic-wrap{display:flex;flex-direction:column;gap:8px;height:100%;min-height:0;color:#ddd;font:12px sans-serif;overflow:hidden}
+      .tut-comic-wrap{display:flex;flex-direction:column;gap:8px;width:100%;height:100%;min-height:0;box-sizing:border-box;color:#ddd;font:12px sans-serif;overflow:hidden}
       .tut-comic-toolbar,.tut-comic-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-      .tut-comic-toolbar{justify-content:space-between;flex-wrap:nowrap}.tut-comic-tools{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;min-width:0}.tut-comic-options{display:flex;gap:8px;align-items:center;flex-wrap:nowrap;white-space:nowrap}
+      .tut-comic-toolbar{justify-content:flex-start;flex-wrap:wrap;width:100%}.tut-comic-tools{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-width:0}.tut-comic-options{display:flex;gap:8px;align-items:center;flex-wrap:wrap;white-space:nowrap}
       .tut-comic-btn,.tut-comic-select,.tut-comic-input{background:#25292e;color:#eee;border:1px solid #555;border-radius:5px;padding:4px 7px;box-sizing:border-box}
       .tut-comic-btn{cursor:pointer;white-space:nowrap}.tut-comic-btn:hover{border-color:#aaa}.tut-comic-btn.active{background:#167d86;border-color:#35d0c8;color:#fff}.tut-comic-btn:disabled{opacity:.35;cursor:not-allowed}
-      .tut-comic-workspace{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:8px;flex:1;min-height:0;overflow:hidden}.tut-comic-monitor{background:#070707;border:1px solid #333;border-radius:8px;padding:10px;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0}
+      .tut-comic-workspace{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:8px;width:100%;flex:1;min-height:0;overflow:hidden}.tut-comic-monitor{background:#070707;border:1px solid #333;border-radius:8px;padding:8px;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 22px;grid-template-rows:minmax(0,1fr) 22px auto;gap:5px;overflow:hidden;min-width:0}
+      .tut-comic-viewport{position:relative;grid-column:1;grid-row:1;min-width:0;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#070707}
+      .tut-comic-pan-x{grid-column:1;grid-row:2;width:100%;height:22px;min-width:0}.tut-comic-pan-y{grid-column:2;grid-row:1;width:22px;height:100%;min-height:0;writing-mode:vertical-lr;direction:rtl}
+      .tut-comic-view-controls{grid-column:1 / 3;grid-row:3;display:grid;grid-template-columns:auto minmax(80px,1fr) auto auto auto;align-items:center;gap:6px;color:#aaa;font-size:10px;min-width:0}.tut-comic-view-zoom{width:100%;min-width:70px}.tut-comic-view-zoom-value{min-width:35px;text-align:right;color:#ddd;font-variant-numeric:tabular-nums}.tut-comic-view-btn{padding:3px 6px;font-size:10px}
       .tut-comic-screen{position:relative;background:#f7f4ec;border:2px solid #555;border-radius:0;overflow:hidden;line-height:0;box-shadow:none}
       .tut-comic-bg,.tut-comic-overlay{position:absolute;inset:0;display:block}.tut-comic-overlay{touch-action:none;cursor:crosshair}
       .tut-comic-sidebar{background:#15171a;border:1px solid #34383d;border-radius:7px;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}.tut-comic-sidebar-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:#30343a;border-bottom:1px solid #3a3e44}.tut-comic-tab{border:0;border-radius:0;background:#202328;color:#aaa;padding:8px 3px;cursor:pointer;font-weight:700}.tut-comic-tab.active{background:#167d86;color:#fff}.tut-comic-sidebar-body{padding:9px;min-height:0;overflow:auto;flex:1}
@@ -101,7 +105,7 @@ function ensureStyle() {
       .tut-comic-edge-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.tut-comic-edge-toggle{background:#25292e;color:#ddd;border:1px solid #555;border-radius:5px;padding:5px 3px;cursor:pointer}.tut-comic-edge-toggle:hover,.tut-comic-edge-toggle.hover{border-color:#f59e0b}.tut-comic-edge-toggle.active{background:#704711;border-color:#f59e0b;color:#fff}
       .tut-comic-range{width:100%;min-width:0}.tut-comic-index{display:block;font-weight:700;color:#fff;background:#167d86;border-radius:4px;padding:4px 7px}
       .tut-comic-layer-help{color:#92979e;font-size:10px;line-height:1.45}.tut-comic-layer-list{display:flex;flex-direction:column;gap:5px}.tut-comic-layer-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:6px;background:#22262b;border:1px solid #444;border-radius:5px;padding:6px 7px;color:#ddd;cursor:pointer}.tut-comic-layer-row.active{border-color:#35d0c8;background:#164f55}.tut-comic-layer-rank{color:#8f979f;text-align:center;font-variant-numeric:tabular-nums}.tut-comic-layer-row.active .tut-comic-layer-rank{color:#fff}.tut-comic-layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.tut-comic-layer-actions .tut-comic-btn{width:100%}
-      @media (max-width:900px){.tut-comic-workspace{grid-template-columns:minmax(0,1fr) 250px}}
+      @media (max-width:1100px){.tut-comic-workspace{grid-template-columns:minmax(0,1fr) 280px}}
     `;
     document.head.appendChild(style);
 }
@@ -214,11 +218,15 @@ function installComicCanvas(node) {
     ensureStyle();
     WIDGET_NAMES.forEach((name) => hideWidget(widgets[name]));
     const priorStoreCallback = widgets.panel_data.callback;
+    const priorLayoutCallback = widgets.layout.callback;
     let data = parseData(widgets.panel_data.value);
     let selected = 0, mode = "frame", drawMode = false, previewImages = [];
     let moving = null, resizing = null, drawing = null, snapGuides = [], invalidQuad = null, hoveredEdge = -1, hoveredCanvasEdge = null;
     let snapEnabled = node.properties?.tutComicCanvasState?.snap_enabled !== false;
     let activeSidebar = node.properties?.tutComicCanvasState?.sidebar_tab || "camera";
+    let viewZoom = clamp(node.properties?.tutComicCanvasState?.view_zoom ?? 1, .25, 4);
+    let viewPanX = clamp(node.properties?.tutComicCanvasState?.view_pan_x ?? 0, -100, 100);
+    let viewPanY = clamp(node.properties?.tutComicCanvasState?.view_pan_y ?? 0, -100, 100);
 
     const root = document.createElement("div"); root.className = "tut-comic-wrap";
     const toolbar = document.createElement("div"); toolbar.className = "tut-comic-toolbar";
@@ -238,10 +246,21 @@ function installComicCanvas(node) {
     toolbar.append(tools, toolbarOptions); root.append(toolbar);
 
     const monitor = document.createElement("div"); monitor.className = "tut-comic-monitor";
+    const viewport = document.createElement("div"); viewport.className = "tut-comic-viewport";
     const screen = document.createElement("div"); screen.className = "tut-comic-screen";
     const bg = document.createElement("canvas"); bg.className = "tut-comic-bg";
     const overlay = document.createElement("canvas"); overlay.className = "tut-comic-overlay";
-    screen.append(bg, overlay); monitor.append(screen);
+    screen.append(bg, overlay); viewport.append(screen);
+    const panX = document.createElement("input"); panX.type = "range"; panX.className = "tut-comic-pan-x"; panX.min = "-100"; panX.max = "100"; panX.step = "1"; panX.value = String(viewPanX); panX.title = "左右滑动画布";
+    const panY = document.createElement("input"); panY.type = "range"; panY.className = "tut-comic-pan-y"; panY.min = "-100"; panY.max = "100"; panY.step = "1"; panY.value = String(viewPanY); panY.title = "上下滑动画布";
+    const viewControls = document.createElement("div"); viewControls.className = "tut-comic-view-controls";
+    const viewZoomLabel = document.createElement("span"); viewZoomLabel.textContent = "预览缩放";
+    const viewZoomRange = document.createElement("input"); viewZoomRange.type = "range"; viewZoomRange.className = "tut-comic-view-zoom"; viewZoomRange.min = ".25"; viewZoomRange.max = "4"; viewZoomRange.step = ".05"; viewZoomRange.value = String(viewZoom);
+    const viewZoomValue = document.createElement("span"); viewZoomValue.className = "tut-comic-view-zoom-value";
+    const fitViewBtn = makeButton("适应画布大小"); fitViewBtn.classList.add("tut-comic-view-btn");
+    const actualViewBtn = makeButton("实际大小"); actualViewBtn.classList.add("tut-comic-view-btn");
+    viewControls.append(viewZoomLabel, viewZoomRange, viewZoomValue, fitViewBtn, actualViewBtn);
+    monitor.append(viewport, panY, panX, viewControls);
 
     const workspace = document.createElement("div"); workspace.className = "tut-comic-workspace";
     const sidebar = document.createElement("aside"); sidebar.className = "tut-comic-sidebar";
@@ -312,7 +331,7 @@ function installComicCanvas(node) {
 
     function layoutName() {
         if (layout.value !== AUTO_LAYOUT) return layout.value;
-        const count = Math.max(1, Math.min(MAX_PANELS, previewImages.length || MAX_PANELS));
+        const count = Math.max(1, Math.min(AUTO_MAX_PANELS, previewImages.length || AUTO_MAX_PANELS));
         return { 1: "整页单格", 2: "左右双格", 3: "上大下二", 4: "四宫格", 5: "五格错落", 6: AUTO_PREVIEW_LAYOUT }[count];
     }
     function canvasSize() {
@@ -487,18 +506,51 @@ function installComicCanvas(node) {
         widgets.panel_data.value = JSON.stringify(data);
         priorStoreCallback?.call(widgets.panel_data, widgets.panel_data.value);
         node.properties = node.properties || {};
-        node.properties.tutComicCanvasState = { version: 3, panel_data: widgets.panel_data.value, snap_enabled: snapEnabled, sidebar_tab: activeSidebar, saved_at: Date.now() };
+        node.properties.tutComicCanvasState = { version: 3, panel_data: widgets.panel_data.value, snap_enabled: snapEnabled, sidebar_tab: activeSidebar, view_zoom: viewZoom, view_pan_x: viewPanX, view_pan_y: viewPanY, saved_at: Date.now() };
         markDirty(); draw();
+    }
+    let syncingFromWidgets = false;
+    function syncUiFromWidgets() {
+        if (syncingFromWidgets) return;
+        syncingFromWidgets = true;
+        try {
+            data = parseData(widgets.panel_data.value);
+            const restoredLayout = widgets.layout.value;
+            layout.value = restoredLayout === AUTO_LAYOUT || PANEL_LAYOUTS[restoredLayout]
+                ? restoredLayout
+                : AUTO_LAYOUT;
+            width.value = String(widgets.canvas_width.value);
+            height.value = String(widgets.canvas_height.value);
+            margin.value = String(widgets.page_margin.value);
+            gutter.value = String(widgets.gutter.value);
+            borderWidth.value = String(widgets.border_width.value);
+            borderColor.value = widgets.border_color.value || "#111111";
+            backgroundColor.value = widgets.background_color.value || "#ffffff";
+            fitMode.value = widgets.fit_mode.value;
+            emptyFill.value = widgets.empty_fill.value;
+            const restoredWidth = Math.max(64, Number(widgets.canvas_width.value) || 1024);
+            const restoredHeight = Math.max(64, Number(widgets.canvas_height.value) || 1536);
+            const restoredPreset = SIZE_PRESETS.find((item) => item[1] === restoredWidth && item[2] === restoredHeight);
+            sizePreset.value = restoredPreset ? restoredPreset[0] : "自定义";
+            selected = Math.max(0, Math.min(selected, resolvedQuads().length - 1));
+        } finally {
+            syncingFromWidgets = false;
+        }
+        draw();
     }
     function resizeCanvas() {
         const [cw, ch] = canvasSize(), backingScale = Math.min(1600 / cw, 1600 / ch, 1);
         const pw = Math.max(64, Math.round(cw * backingScale)), ph = Math.max(64, Math.round(ch * backingScale));
         if (bg.width !== pw || bg.height !== ph) { bg.width = overlay.width = pw; bg.height = overlay.height = ph; }
-        const maxW = Math.max(100, monitor.clientWidth - 24), maxH = Math.max(100, monitor.clientHeight - 24);
+        const maxW = Math.max(100, viewport.clientWidth - 8), maxH = Math.max(100, viewport.clientHeight - 8);
         const fit = Math.min(maxW / pw, maxH / ph, 1);
-        const displayW = Math.max(60, Math.round(pw * fit)), displayH = Math.max(60, Math.round(ph * fit));
+        const displayW = Math.max(60, Math.round(pw * fit * viewZoom)), displayH = Math.max(60, Math.round(ph * fit * viewZoom));
         screen.style.width = `${displayW}px`; screen.style.height = `${displayH}px`;
         bg.style.width = overlay.style.width = `${displayW}px`; bg.style.height = overlay.style.height = `${displayH}px`;
+        const overflowX = Math.max(0, displayW - viewport.clientWidth), overflowY = Math.max(0, displayH - viewport.clientHeight);
+        screen.style.transform = `translate(${viewPanX / 100 * overflowX / 2}px, ${viewPanY / 100 * overflowY / 2}px)`;
+        panX.value = String(viewPanX); panY.value = String(viewPanY); viewZoomRange.value = String(viewZoom);
+        viewZoomValue.textContent = `${viewZoom.toFixed(2)}×`;
     }
     function drawGrid() {
         if (!gridCheck.checked) return;
@@ -529,6 +581,23 @@ function installComicCanvas(node) {
         const nx = sign * dy / length, ny = -sign * dx / length, distance = Math.hypot(overlay.width, overlay.height) * 2;
         return [a, b, [b[0] + nx * distance, b[1] + ny * distance], [a[0] + nx * distance, a[1] + ny * distance]];
     }
+    function cameraDragDirections(image, quad, panel) {
+        const fallback = { x: -1, y: -1 };
+        if (!image?.naturalWidth || !image?.naturalHeight) return fallback;
+        const points = pixelQuad(quad), [x0, y0, x1, y1] = quadBounds(points);
+        const frameWidth = Math.max(1, x1 - x0), frameHeight = Math.max(1, y1 - y0);
+        const contain = fitMode.value === "完整显示";
+        const scale = (contain
+            ? Math.min(frameWidth / image.naturalWidth, frameHeight / image.naturalHeight)
+            : Math.max(frameWidth / image.naturalWidth, frameHeight / image.naturalHeight)) * panel.zoom;
+        const imageWidth = image.naturalWidth * scale, imageHeight = image.naturalHeight * scale;
+        const horizontalSpan = Math.sign(frameWidth - imageWidth);
+        const verticalSpan = Math.sign(frameHeight - imageHeight);
+        return {
+            x: horizontalSpan,
+            y: verticalSpan === 0 ? 0 : verticalSpan,
+        };
+    }
     function drawPreview(image, quad, panel) {
         if (!image?.complete || !image.naturalWidth) return false;
         const points = pixelQuad(quad), [x0, y0, x1, y1] = quadBounds(points), x = x0, y = y0, w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
@@ -539,7 +608,7 @@ function installComicCanvas(node) {
         ctx.save(); ctx.beginPath(); addQuadPath(ctx, points);
         panel.open_edges.forEach((open, index) => { if (open) addQuadPath(ctx, edgeExtrusion(points, index)); });
         ctx.clip("nonzero");
-        if (panel.flip) { ctx.translate(x * 2 + w, 0); ctx.scale(-1, 1); ctx.drawImage(image, drawX, drawY, drawW, drawH); }
+        if (panel.flip) { ctx.translate(drawX * 2 + drawW, 0); ctx.scale(-1, 1); ctx.drawImage(image, drawX, drawY, drawW, drawH); }
         else ctx.drawImage(image, drawX, drawY, drawW, drawH);
         ctx.restore(); return true;
     }
@@ -679,7 +748,7 @@ function installComicCanvas(node) {
         const hit = hitTest(p); if (!hit) return; selected = hit.index;
         if (mode === "camera") {
             const panel = data.panels[selected];
-            moving = { camera: true, start: p, focus_x: panel.focus_x, focus_y: panel.focus_y };
+            moving = { camera: true, panelIndex: selected, start: p, focus_x: panel.focus_x, focus_y: panel.focus_y, quad: clone(resolvedQuads()[selected]) };
         } else if (hit.handle === "move") moving = { start: p, quad: clone(resolvedQuads()[selected]) };
         else if (hit.handle === "edge") {
             const quad = clone(resolvedQuads()[selected]); resizing = { edge: hit.edge, start: p, quad, motion: edgeMotion(quad, hit.edge) };
@@ -696,9 +765,14 @@ function installComicCanvas(node) {
         if (drawing) { snapGuides = []; const bounded = pointInPage(p); drawing.x1 = bounded.x; drawing.y1 = bounded.y; draw(); return; }
         if (moving?.camera) {
             snapGuides = [];
-            const [x0, y0, x1, y1] = quadBounds(resolvedQuads()[selected]), panel = data.panels[selected];
-            panel.focus_x = clamp(moving.focus_x - (p.x - moving.start.x) / Math.max(.001, x1 - x0));
-            panel.focus_y = clamp(moving.focus_y - (p.y - moving.start.y) / Math.max(.001, y1 - y0));
+            const dragIndex = Number.isInteger(moving.panelIndex) ? moving.panelIndex : selected;
+            const quad = moving.quad || resolvedQuads()[dragIndex];
+            const panel = data.panels[dragIndex];
+            selected = Math.max(0, Math.min(dragIndex, data.panels.length - 1));
+            const [x0, y0, x1, y1] = quadBounds(quad);
+            const directions = cameraDragDirections(previewFor(dragIndex), quad, panel);
+            panel.focus_x = clamp(moving.focus_x + directions.x * (p.x - moving.start.x) / Math.max(.001, x1 - x0));
+            panel.focus_y = clamp(moving.focus_y + directions.y * (p.y - moving.start.y) / Math.max(.001, y1 - y0));
             draw(); return;
         }
         if (moving) {
@@ -803,26 +877,78 @@ function installComicCanvas(node) {
     borderWidth.addEventListener("change", () => { setWidget("border_width", Math.max(0, Math.round(Number(borderWidth.value) || 0))); draw(); });
     borderColor.addEventListener("input", () => { setWidget("border_color", borderColor.value); draw(); }); backgroundColor.addEventListener("input", () => { setWidget("background_color", backgroundColor.value); draw(); });
     fitMode.addEventListener("change", () => { setWidget("fit_mode", fitMode.value); draw(); }); emptyFill.addEventListener("change", () => { setWidget("empty_fill", emptyFill.value); draw(); });
+    function saveViewState() {
+        node.properties = node.properties || {};
+        node.properties.tutComicCanvasState = { ...(node.properties.tutComicCanvasState || {}), version: 3, view_zoom: viewZoom, view_pan_x: viewPanX, view_pan_y: viewPanY, saved_at: Date.now() };
+        markDirty();
+    }
+    viewZoomRange.addEventListener("input", () => { viewZoom = clamp(viewZoomRange.value, .25, 4); resizeCanvas(); saveViewState(); });
+    panX.addEventListener("input", () => { viewPanX = clamp(panX.value, -100, 100); resizeCanvas(); saveViewState(); });
+    panY.addEventListener("input", () => { viewPanY = clamp(panY.value, -100, 100); resizeCanvas(); saveViewState(); });
+    fitViewBtn.addEventListener("click", () => { viewZoom = 1; viewPanX = 0; viewPanY = 0; resizeCanvas(); saveViewState(); });
+    actualViewBtn.addEventListener("click", () => {
+        const fit = Math.min(Math.max(1, viewport.clientWidth - 8) / Math.max(1, bg.width), Math.max(1, viewport.clientHeight - 8) / Math.max(1, bg.height), 1);
+        viewZoom = clamp(1 / Math.max(.001, fit), .25, 4); viewPanX = 0; viewPanY = 0; resizeCanvas(); saveViewState();
+    });
     zoom.addEventListener("input", () => { data.panels[selected].zoom = Number(zoom.value); writeData(); });
     flip.addEventListener("click", () => { data.panels[selected].flip = !data.panels[selected].flip; writeData(); });
     resetCamera.addEventListener("click", () => { Object.assign(data.panels[selected], { focus_x: .5, focus_y: .5, zoom: 1, flip: false }); writeData(); });
     edgeButtons.forEach((button, index) => button.addEventListener("click", () => { data.panels[selected].open_edges[index] = !data.panels[selected].open_edges[index]; syncLegacyEdges(data.panels[selected]); writeData(); }));
 
-    layout.value = widgets.layout.value || AUTO_LAYOUT; width.value = String(widgets.canvas_width.value); height.value = String(widgets.canvas_height.value);
-    margin.value = String(widgets.page_margin.value); gutter.value = String(widgets.gutter.value); borderWidth.value = String(widgets.border_width.value);
-    borderColor.value = widgets.border_color.value || "#111111"; backgroundColor.value = widgets.background_color.value || "#ffffff";
-    fitMode.value = widgets.fit_mode.value; emptyFill.value = widgets.empty_fill.value; commitCanvasSize();
-    widgets.panel_data.callback = function (...args) { const result = priorStoreCallback?.apply(this, args); data = parseData(widgets.panel_data.value); selected = Math.min(selected, resolvedQuads().length - 1); draw(); return result; };
+    syncUiFromWidgets();
+    widgets.layout.callback = function (...args) {
+        const result = priorLayoutCallback?.apply(this, args);
+        const restoredLayout = widgets.layout.value;
+        layout.value = restoredLayout === AUTO_LAYOUT || PANEL_LAYOUTS[restoredLayout]
+            ? restoredLayout
+            : AUTO_LAYOUT;
+        selected = Math.max(0, Math.min(selected, resolvedQuads().length - 1));
+        draw();
+        return result;
+    };
+    widgets.panel_data.callback = function (...args) { const result = priorStoreCallback?.apply(this, args); syncUiFromWidgets(); return result; };
     const domWidget = node.addDOMWidget("tut_comic_canvas_v2", "TUT_COMIC_CANVAS_V2", root, { serialize: false, hideOnZoom: false });
-    domWidget.computeSize = (nodeWidth) => [nodeWidth, 900];
+    const DOM_TITLE_HEIGHT = 140;
+    domWidget.computeSize = () => [Math.max(1280, Number(node.size?.[0]) || 0), Math.max(900, Math.max(1040, Number(node.size?.[1]) || 0) - DOM_TITLE_HEIGHT)];
     node.__tutComicCanvasV2 = true;
+    const syncDomWidth = (size = node.size) => {
+        const logicalWidth = Math.max(1280, Number(size?.[0]) || 0);
+        const logicalHeight = Math.max(1040, Number(size?.[1]) || 0);
+        const domHeight = Math.max(900, logicalHeight - DOM_TITLE_HEIGHT);
+        root.style.width = `${Math.max(320, logicalWidth - 20)}px`;
+        root.style.height = `${domHeight}px`;
+        domWidget.computeSize = () => [logicalWidth, domHeight];
+    };
+    let enforcingMinimumSize = false;
+    const priorConfigure = node.onConfigure;
+    node.onConfigure = function (...args) {
+        const result = priorConfigure?.apply(this, args);
+        requestAnimationFrame(syncUiFromWidgets);
+        setTimeout(syncUiFromWidgets, 0);
+        return result;
+    };
+    const priorResize = node.onResize;
+    node.onResize = function (size) {
+        if (!enforcingMinimumSize && (Number(size?.[0]) < 1280 || Number(size?.[1]) < 1040)) {
+            enforcingMinimumSize = true;
+            this.setSize?.([Math.max(1280, Number(size?.[0]) || 0), Math.max(1040, Number(size?.[1]) || 0)]);
+            enforcingMinimumSize = false;
+            size = this.size;
+        }
+        priorResize?.call(this, size); syncDomWidth(size); requestAnimationFrame(draw);
+    };
     const resizeObserver = new ResizeObserver(() => { if (monitor.isConnected) requestAnimationFrame(draw); });
     resizeObserver.observe(monitor);
     const priorRemoved = node.onRemoved;
     node.onRemoved = function (...args) { resizeObserver.disconnect(); return priorRemoved?.apply(this, args); };
-    const ensureDefaultSize = () => node.setSize?.([Math.max(node.size?.[0] || 0, 1100), Math.max(node.size?.[1] || 0, 1040)]);
+    const ensureDefaultSize = () => node.setSize?.([Math.max(node.size?.[0] || 0, 1280), Math.max(node.size?.[1] || 0, 1040)]);
+    syncDomWidth();
     ensureDefaultSize();
-    requestAnimationFrame(() => { ensureDefaultSize(); draw(); setTimeout(() => { ensureDefaultSize(); draw(); }, 100); setTimeout(() => { ensureDefaultSize(); draw(); }, 350); });
+    requestAnimationFrame(() => {
+        ensureDefaultSize(); syncUiFromWidgets();
+        setTimeout(() => { ensureDefaultSize(); syncUiFromWidgets(); }, 100);
+        setTimeout(() => { ensureDefaultSize(); syncUiFromWidgets(); }, 350);
+    });
 }
 
 app.registerExtension({

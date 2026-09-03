@@ -461,6 +461,32 @@ def _quad_geometry(quad, size: tuple[int, int], margin: int, stroke: int, label:
     }
 
 
+def _closed_quad_border_mask(size, geometry, open_edges):
+    border = Image.new("L", size, 0)
+    for edge_index, edge_mask in enumerate(geometry["edge_masks"]):
+        if not open_edges[edge_index]:
+            border = ImageChops.lighter(border, edge_mask)
+    return border
+
+
+def _closed_rect_border_mask(size, outer, stroke, open_edges):
+    border = Image.new("L", size, 0)
+    if not stroke:
+        return border
+    left, top, right, bottom = outer
+    draw = ImageDraw.Draw(border)
+    edges = (
+        (left, top, right - 1, min(bottom - 1, top + stroke - 1)),
+        (max(left, right - stroke), top, right - 1, bottom - 1),
+        (left, max(top, bottom - stroke), right - 1, bottom - 1),
+        (left, top, min(right - 1, left + stroke - 1), bottom - 1),
+    )
+    for edge_index, coordinates in enumerate(edges):
+        if not open_edges[edge_index]:
+            draw.rectangle(coordinates, fill=255)
+    return border
+
+
 def _render_quad_source(canvas, panel_mask, border_mask, source, geometry, settings, mode, background):
     width, height = canvas.size
     left, top, right, bottom = geometry["bbox"]
@@ -541,7 +567,7 @@ def render_comic_panels(
         canvas = Image.new("RGB", (width, height), bg)
         panel_mask = Image.new("L", (width, height), 0)
         border_mask = Image.new("L", (width, height), 0)
-        canvas_draw, panel_draw, border_draw = ImageDraw.Draw(canvas), ImageDraw.Draw(panel_mask), ImageDraw.Draw(border_mask)
+        panel_draw, border_draw = ImageDraw.Draw(panel_mask), ImageDraw.Draw(border_mask)
         custom_quads = quad_overrides.get(page_layout)
         if custom_quads is not None:
             geometry = [
@@ -553,9 +579,7 @@ def render_comic_panels(
             ]
             border_layer = Image.new("RGB", (width, height), line)
             for item in geometry:
-                canvas.paste(border_layer, (0, 0), item["border"])
                 panel_mask.paste(255, (0, 0), item["inner"])
-                border_mask.paste(255, (0, 0), item["border"])
             order = layer_orders.get(page_layout, tuple(range(len(custom_quads))))
             for index in order:
                 source = sources[index] if index < len(sources) else None
@@ -564,6 +588,11 @@ def render_comic_panels(
                         canvas, panel_mask, border_mask, source, geometry[index],
                         panels[index], fit_mode, bg,
                     )
+                closed_border = _closed_quad_border_mask(
+                    (width, height), geometry[index], panels[index]["open_edges"]
+                )
+                canvas.paste(border_layer, (0, 0), closed_border)
+                border_mask.paste(255, (0, 0), closed_border)
             outputs.append(canvas)
             panel_masks.append(panel_mask)
             border_masks.append(border_mask)
@@ -576,18 +605,16 @@ def render_comic_panels(
                 x0, y0, x1, y1 = _absolute_pixel_rect(normalized, width, height, margin)
             else:
                 x0, y0, x1, y1 = _pixel_rect(normalized, width, height, margin, gap)
-            if stroke:
-                canvas_draw.rectangle((x0, y0, x1 - 1, y1 - 1), fill=line)
-                border_draw.rectangle((x0, y0, x1 - 1, y1 - 1), fill=255, width=stroke)
             inner = (x0 + stroke, y0 + stroke, x1 - stroke, y1 - stroke)
             if inner[2] <= inner[0] or inner[3] <= inner[1]:
                 raise ValueError("画格边框过宽，已经挤占全部画面区域")
             panel_draw.rectangle((inner[0], inner[1], inner[2] - 1, inner[3] - 1), fill=255)
-            geometry.append(inner)
+            geometry.append({"outer": (x0, y0, x1, y1), "inner": inner})
 
         order = layer_orders.get(page_layout, tuple(range(len(rectangles))))
+        border_layer = Image.new("RGB", (width, height), line)
         for index in order:
-            inner = geometry[index]
+            inner = geometry[index]["inner"]
             source = sources[index] if index < len(sources) else None
             if source is not None:
                 settings = panels[index]
@@ -635,6 +662,12 @@ def render_comic_panels(
                                 ImageChops.subtract(current_border, crop_alpha),
                                 (visible_left, visible_top),
                             )
+            closed_border = _closed_rect_border_mask(
+                (width, height), geometry[index]["outer"], stroke,
+                panels[index]["open_edges"],
+            )
+            canvas.paste(border_layer, (0, 0), closed_border)
+            border_mask.paste(255, (0, 0), closed_border)
         outputs.append(canvas)
         panel_masks.append(panel_mask)
         border_masks.append(border_mask)

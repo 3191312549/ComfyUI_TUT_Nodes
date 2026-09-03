@@ -19,7 +19,6 @@ from ComfyUI_TUT_Nodes.categories import (
     IMAGE_TEXT,
     LATENT_UPSCALING,
     MODEL_LORA,
-    PENDING_IMAGE_COMIC,
     TOOLS_BATCH,
     TOOLS_EXCEL,
     TOOLS_WORKFLOW,
@@ -106,7 +105,7 @@ class TUTNodesSmokeTests(unittest.TestCase):
                 self.assertEqual(node_class.CATEGORY, IMAGE_COMIC)
                 continue
             if node_id == "TUT_ComicSpeechBubble":
-                self.assertEqual(node_class.CATEGORY, PENDING_IMAGE_COMIC)
+                self.assertEqual(node_class.CATEGORY, IMAGE_COMIC)
                 continue
             if node_id == "TUT_AdvancedAudioLoader":
                 self.assertEqual(node_class.CATEGORY, AUDIO)

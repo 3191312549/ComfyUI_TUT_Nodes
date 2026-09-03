@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...categories import IMAGE_COMIC, PENDING_IMAGE_COMIC
+from ...categories import IMAGE_COMIC
 from ...core.comic import AUTO_LAYOUT, PANEL_LAYOUTS, render_comic_panels, render_speech_bubbles
 from ...core.fonts import font_options
 from ...web_routes import register_font_routes
@@ -78,7 +78,7 @@ class TUT_ComicSpeechBubble:
     RETURN_TYPES = ("IMAGE", "STRING", "MASK", "MASK", "STRING")
     RETURN_NAMES = ("image", "show_help", "bubble_mask", "text_mask", "bubble_data")
     FUNCTION = "render"
-    CATEGORY = PENDING_IMAGE_COMIC
+    CATEGORY = IMAGE_COMIC
     DESCRIPTION = "在漫画或任意图片上添加可保存、可拖动的对白框、思考框、喊话框、旁白框和文字。"
 
     @staticmethod
@@ -109,5 +109,5 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TUT_ComicPanelCanvas": "TUT_漫画分镜画布",
-    "TUT_ComicSpeechBubble": "TUT_[待测试]漫画对话框",
+    "TUT_ComicSpeechBubble": "TUT_漫画对话框",
 }

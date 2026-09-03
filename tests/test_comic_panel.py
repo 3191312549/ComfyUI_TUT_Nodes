@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import torch
 
-from ComfyUI_TUT_Nodes.categories import IMAGE_COMIC, PENDING_IMAGE_COMIC
+from ComfyUI_TUT_Nodes.categories import IMAGE_COMIC
 from ComfyUI_TUT_Nodes.core.comic import BUBBLE_SHAPES, CUSTOM_LAYOUT, parse_bubble_data, parse_panel_data
 from ComfyUI_TUT_Nodes.core.fonts import font_for_text, font_options
 from ComfyUI_TUT_Nodes.nodes.pending.comic import (
@@ -42,6 +42,17 @@ class ComicPanelTests(unittest.TestCase):
         self.assertEqual(parsed["version"], 1)
         self.assertEqual(len(parsed["panels"]), 20)
         self.assertEqual(set(self.node.INPUT_TYPES()["hidden"]), {"prompt", "extra_pnginfo"})
+
+    def test_custom_layout_accepts_twenty_panels(self):
+        images = torch.rand((20, 24, 24, 3), dtype=torch.float32)
+        left, right = 12 / 240, 1 - 12 / 240
+        rectangles = [[left + index * (right - left) / 20, 12 / 320,
+                       left + (index + 1) * (right - left) / 20, 1 - 12 / 320]
+                      for index in range(20)]
+        data = json.dumps({"version": 1, "panels": [], "layout_overrides": {CUSTOM_LAYOUT: rectangles}})
+        output, _, _, _, canonical = self.compose(images, CUSTOM_LAYOUT, panel_data=data)
+        self.assertEqual(tuple(output.shape), (1, 320, 240, 3))
+        self.assertEqual(len(json.loads(canonical)["layout_overrides"][CUSTOM_LAYOUT]), 20)
 
     def test_execution_returns_input_preview_metadata(self):
         images = torch.rand((2, 32, 32, 3), dtype=torch.float32)
@@ -221,6 +232,34 @@ class ComicPanelTests(unittest.TestCase):
         self.assertGreater(float(red_front[0, 160, 120, 0]), .9)
         self.assertEqual(json.loads(canonical)["layer_orders"][CUSTOM_LAYOUT], [1, 0])
 
+    def test_higher_layer_frame_is_redrawn_over_lower_open_image(self):
+        images = torch.zeros((2, 40, 40, 3), dtype=torch.float32)
+        images[0, ..., 0] = 1.0
+        images[1, ..., 1] = 1.0
+        panels = [
+            {"zoom": 2, "open_edges": [True, True, True, True]},
+            {"zoom": 1, "open_edges": [False, False, False, False]},
+        ]
+        rects = [[.1, .1, .7, .7], [.35, .25, .85, .75]]
+        quads = [
+            [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+            for x0, y0, x1, y1 in rects
+        ]
+        for override_key, geometry in (("layout_overrides", rects), ("quad_overrides", quads)):
+            data = {"version": 1, "panels": panels, override_key: {CUSTOM_LAYOUT: geometry}}
+            top_frame, _, _, top_frame_mask, _ = self.compose(
+                images, CUSTOM_LAYOUT, panel_data=json.dumps(data)
+            )
+            data["layer_orders"] = {CUSTOM_LAYOUT: [1, 0]}
+            lower_frame, _, _, lower_frame_mask, _ = self.compose(
+                images, CUSTOM_LAYOUT, panel_data=json.dumps(data)
+            )
+            with self.subTest(geometry=override_key):
+                self.assertGreater(float(top_frame_mask[0, 160, 84]), .9)
+                self.assertTrue(torch.all(top_frame[0, 160, 84] < .1))
+                self.assertLess(float(lower_frame_mask[0, 160, 84]), .1)
+                self.assertGreater(float(lower_frame[0, 160, 84, 0]), .9)
+
     def test_rgba_input_is_composited_over_page_background_instead_of_black(self):
         rgba = torch.zeros((1, 40, 40, 4), dtype=torch.float32)
         rgba[:, 10:30, 10:30, 0] = 1.0
@@ -297,8 +336,8 @@ class ComicBubbleTests(unittest.TestCase):
         }
 
     def test_interface_eight_shapes_batch_and_masks(self):
-        self.assertEqual(self.node.CATEGORY, PENDING_IMAGE_COMIC)
-        self.assertEqual(NODE_DISPLAY_NAME_MAPPINGS["TUT_ComicSpeechBubble"], "TUT_[待测试]漫画对话框")
+        self.assertEqual(self.node.CATEGORY, IMAGE_COMIC)
+        self.assertEqual(NODE_DISPLAY_NAME_MAPPINGS["TUT_ComicSpeechBubble"], "TUT_漫画对话框")
         self.assertEqual(set(self.node.INPUT_TYPES()["hidden"]), {"prompt", "extra_pnginfo"})
         bubbles = [
             self.bubble(shape, index) | {"x": .14 + (index % 4) * .24, "y": .28 + (index // 4) * .44, "w": .19, "h": .24}
@@ -511,21 +550,27 @@ class ComicFrontendTests(unittest.TestCase):
         for feature in ("layout_overrides", "canvas_width", "canvas_height", "1024 × 1536"):
             self.assertIn(feature, editor)
         for feature in (
-            "添加画框", "自由画框", "switchToCustomLayout", "画布与间距", "画框与镜头", "页面样式",
+            "添加画框", "自由画框", "switchToCustomLayout", "const MAX_PANELS = 20", "AUTO_MAX_PANELS = 6", "画布与间距", "画框与镜头", "页面样式",
             "tut-comic-monitor", "tut-comic-sidebar", "tut-comic-sidebar-tabs", "tut-comic-workspace",
-            "border-radius:0", "Math.max(node.size?.[0] || 0, 1100)", "tut-comic-fields", "16:9", "9:16",
+            "border-radius:0", "Math.max(node.size?.[0] || 0, 1280)", "tut-comic-fields", "16:9", "9:16",
             "强制页边距", "remapOverrides", "pageBounds", "input_previews", "drawPreview", "__tutComicSetPreviews",
             "水平翻转", "重置镜头", 'addEventListener("wheel"', "passive: false", "frameStroke", "borderColor.value",
             "吸附对齐", "snap_enabled", "alignmentTargets", "snapMove", "snapCoordinate", "#ff4fc8",
             "逐边开放", "边 1", "边 4", "open_edges", "quad_overrides", "rectToQuad", "validQuad", "pointInQuad", "edgeExtrusion", "#f59e0b",
-            "ResizeObserver", "resizeObserver.disconnect",
+            "ResizeObserver", "resizeObserver.disconnect", "width:100%", "grid-template-columns:minmax(0,1fr) 320px", "syncDomWidth", "enforcingMinimumSize", "node.onResize", "Math.max(node.size?.[0] || 0, 1280)",
             "edgeMotion", "snapEdgeMove", "quadInPage", "hoveredCanvasEdge", "ew-resize", "ns-resize", "nwse-resize", "nesw-resize",
+            "cameraDragDirections", "panelIndex: selected", "horizontalSpan", "verticalSpan", "drawX * 2 + drawW",
             "overflow_top", "overflow_bottom", "overflow_left", "overflow_right",
             "镜头图层", "置于顶层", "上移一层", "下移一层", "置于底层", "恢复默认顺序", "layer_orders", "moveSelectedLayer", "renderLayerList",
+            "tut-comic-viewport", "tut-comic-pan-x", "tut-comic-pan-y", "预览缩放", "适应画布大小", "实际大小", "view_zoom", "view_pan_x", "view_pan_y",
+            "DOM_TITLE_HEIGHT", "root.style.height", "logicalHeight", "domHeight",
+            "syncUiFromWidgets", "priorLayoutCallback", "priorConfigure", "node.onConfigure",
         ):
             self.assertIn(feature, canvas)
         self.assertNotIn("drawBtn.disabled = !free", canvas)
         self.assertNotIn("deleteBtn.disabled = !free", canvas)
+        self.assertNotIn("x * 2 + w", canvas)
+        self.assertNotIn("panel.flip ? -horizontalSpan", canvas)
         for feature in (
             "tut-bubble-workspace", "tut-bubble-monitor", "tut-bubble-sidebar", "tut-bubble-tabs",
             "内容", "样式", "图层", "添加对话框", "置于顶层", "置于底层", "对话框图层",
@@ -533,7 +578,7 @@ class ComicFrontendTests(unittest.TestCase):
             "搜索字体名称或路径", "未找到匹配字体", "当前字体未改变", "filterFonts", "hideStore(fontWidget)",
             "尖角数量", "尖角深度", "spike_count", "spike_depth", "tut-bubble-burst",
             "云瓣数量", "云瓣起伏", "cloud_lobes", "cloud_depth", "tut-bubble-cloud",
-            "store.options.hidden = true", "store.draw = () => {}",
+            "store.options.hidden = true", "store.draw = () => {}", "tut-bubble-wrap{display:flex;flex-direction:column;gap:8px;width:100%", "syncDomWidth", "enforcingMinimumSize", "node.onResize", "Math.max(node.size?.[0] || 0, 1280)",
             "quadraticCurveTo", "function drawCanvas",
             "合并重叠边框", "merge_overlaps", "相交气泡合为一个轮廓", "最上层气泡的外观",
             "text_direction", "vertical_ltr", "vertical_rtl", "竖排列方向", "列从左到右", "列从右到左",
