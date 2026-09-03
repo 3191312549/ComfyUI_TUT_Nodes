@@ -67,7 +67,7 @@ def parse_color(name: str, custom_hex: str, default=(0, 0, 0)) -> tuple[int, int
         raise ValueError(f"颜色包含无效字符：{custom_hex!r}") from exc
 
 
-def image_tensor_to_pil_batch(images) -> list[Image.Image]:
+def image_tensor_to_pil_batch(images, preserve_alpha: bool = False) -> list[Image.Image]:
     array = images.detach().cpu().float().numpy() if hasattr(images, "detach") else np.asarray(images)
     if array.ndim == 3:
         array = array[None, ...]
@@ -84,8 +84,11 @@ def image_tensor_to_pil_batch(images) -> list[Image.Image]:
             image = Image.fromarray(frame, "RGB")
         elif channels == 4:
             rgba = Image.fromarray(frame, "RGBA")
-            background = Image.new("RGBA", rgba.size, (0, 0, 0, 255))
-            image = Image.alpha_composite(background, rgba).convert("RGB")
+            if preserve_alpha:
+                image = rgba
+            else:
+                background = Image.new("RGBA", rgba.size, (0, 0, 0, 255))
+                image = Image.alpha_composite(background, rgba).convert("RGB")
         else:
             raise ValueError(f"不支持 {channels} 通道 IMAGE")
         result.append(image)

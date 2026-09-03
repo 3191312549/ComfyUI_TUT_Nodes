@@ -1,5 +1,6 @@
 import json
 import unittest
+from collections import deque
 from pathlib import Path
 from unittest.mock import patch
 
@@ -7,7 +8,7 @@ import torch
 
 from ComfyUI_TUT_Nodes.categories import IMAGE_COMIC, PENDING_IMAGE_COMIC
 from ComfyUI_TUT_Nodes.core.comic import BUBBLE_SHAPES, CUSTOM_LAYOUT, parse_bubble_data, parse_panel_data
-from ComfyUI_TUT_Nodes.core.fonts import font_options
+from ComfyUI_TUT_Nodes.core.fonts import font_for_text, font_options
 from ComfyUI_TUT_Nodes.nodes.pending.comic import (
     NODE_DISPLAY_NAME_MAPPINGS,
     TUT_ComicPanelCanvas,
@@ -39,7 +40,7 @@ class ComicPanelTests(unittest.TestCase):
         self.assertIn("TUT_ComicPanelCanvas", help_text)
         parsed = json.loads(canonical)
         self.assertEqual(parsed["version"], 1)
-        self.assertEqual(len(parsed["panels"]), 6)
+        self.assertEqual(len(parsed["panels"]), 20)
         self.assertEqual(set(self.node.INPUT_TYPES()["hidden"]), {"prompt", "extra_pnginfo"})
 
     def test_execution_returns_input_preview_metadata(self):
@@ -220,9 +221,31 @@ class ComicPanelTests(unittest.TestCase):
         self.assertGreater(float(red_front[0, 160, 120, 0]), .9)
         self.assertEqual(json.loads(canonical)["layer_orders"][CUSTOM_LAYOUT], [1, 0])
 
+    def test_rgba_input_is_composited_over_page_background_instead_of_black(self):
+        rgba = torch.zeros((1, 40, 40, 4), dtype=torch.float32)
+        rgba[:, 10:30, 10:30, 0] = 1.0
+        rgba[:, 10:30, 10:30, 3] = 1.0
+
+        rectangular = self.compose(rgba, "整页单格")[0]
+        self.assertTrue(torch.all(rectangular[0, 30, 30] > 0.95))
+        self.assertGreater(float(rectangular[0, 160, 120, 0]), 0.95)
+        self.assertLess(float(rectangular[0, 160, 120, 1]), 0.05)
+
+        quad_data = json.dumps({
+            "version": 1,
+            "panels": [],
+            "quad_overrides": {
+                "整页单格": [[[0.1, 0.1], [0.9, 0.14], [0.86, 0.9], [0.14, 0.86]]]
+            },
+        })
+        quadrilateral = self.compose(rgba, "整页单格", panel_data=quad_data)[0]
+        self.assertTrue(torch.all(quadrilateral[0, 60, 60] > 0.95))
+        self.assertGreater(float(quadrilateral[0, 160, 120, 0]), 0.95)
+        self.assertLess(float(quadrilateral[0, 160, 120, 1]), 0.05)
+
     def test_panel_json_validation(self):
         panels, canonical = parse_panel_data("")
-        self.assertEqual(len(panels), 6)
+        self.assertEqual(len(panels), 20)
         self.assertEqual(json.loads(canonical)["version"], 1)
         invalid = (
             ('{"panels":[]}', "version"),
@@ -235,7 +258,7 @@ class ComicPanelTests(unittest.TestCase):
             ('{"version":1,"panels":[],"layout_overrides":{"未知":[]}}', "未知模板"),
             ('{"version":1,"panels":[],"layout_overrides":{"左右双格":[[0,0,1,1]]}}', "数量必须为 2"),
             ('{"version":1,"panels":[],"layout_overrides":{"整页单格":[[0,0,0,1]]}}', "必须大于"),
-            ('{"version":1,"panels":[],"layout_overrides":{"自由画框":[]}}', "1 到 6"),
+            ('{"version":1,"panels":[],"layout_overrides":{"自由画框":[]}}', "1 到 20"),
             ('{"version":1,"panels":[{"open_edges":[true,false]}]}', "4 个布尔值"),
             ('{"version":1,"panels":[{"open_edges":[true,false,0,false]}]}', "布尔值"),
             ('{"version":1,"panels":[],"quad_overrides":[]}', "quad_overrides"),
@@ -259,8 +282,8 @@ class ComicBubbleTests(unittest.TestCase):
         self.font = font_options()[0]
         self.image = torch.rand((2, 240, 320, 3), dtype=torch.float32)
 
-    def render(self, bubbles, enabled=True):
-        data = json.dumps({"version": 1, "bubbles": bubbles}, ensure_ascii=False)
+    def render(self, bubbles, enabled=True, merge_overlaps=False):
+        data = json.dumps({"version": 1, "merge_overlaps": merge_overlaps, "bubbles": bubbles}, ensure_ascii=False)
         return self.node.render(self.image, enabled, self.font, data)
 
     def bubble(self, shape, index=0, text="中文台词自动换行测试"):
@@ -273,11 +296,14 @@ class ComicBubbleTests(unittest.TestCase):
             "border_color": "#111111", "border_width": 3, "opacity": 1,
         }
 
-    def test_interface_six_shapes_batch_and_masks(self):
+    def test_interface_eight_shapes_batch_and_masks(self):
         self.assertEqual(self.node.CATEGORY, PENDING_IMAGE_COMIC)
         self.assertEqual(NODE_DISPLAY_NAME_MAPPINGS["TUT_ComicSpeechBubble"], "TUT_[待测试]漫画对话框")
         self.assertEqual(set(self.node.INPUT_TYPES()["hidden"]), {"prompt", "extra_pnginfo"})
-        bubbles = [self.bubble(shape, index) for index, shape in enumerate(BUBBLE_SHAPES)]
+        bubbles = [
+            self.bubble(shape, index) | {"x": .14 + (index % 4) * .24, "y": .28 + (index // 4) * .44, "w": .19, "h": .24}
+            for index, shape in enumerate(BUBBLE_SHAPES)
+        ]
         output, help_text, bubble_mask, text_mask, canonical = self.render(bubbles)
         self.assertEqual(tuple(output.shape), tuple(self.image.shape))
         self.assertEqual(tuple(bubble_mask.shape), (2, 240, 320))
@@ -287,9 +313,129 @@ class ComicBubbleTests(unittest.TestCase):
         self.assertFalse(torch.equal(output, self.image))
         self.assertIn("TUT_ComicSpeechBubble", help_text)
         canonical_bubbles = json.loads(canonical)["bubbles"]
-        self.assertEqual(len(canonical_bubbles), 6)
+        self.assertEqual(len(canonical_bubbles), 8)
         self.assertNotIn("tail_x", canonical_bubbles[0])
         self.assertNotIn("tail_y", canonical_bubbles[0])
+        self.assertEqual(canonical_bubbles[0]["spike_count"], 16)
+        self.assertAlmostEqual(canonical_bubbles[0]["spike_depth"], .22)
+        self.assertEqual(canonical_bubbles[0]["cloud_lobes"], 10)
+        self.assertAlmostEqual(canonical_bubbles[0]["cloud_depth"], .14)
+        self.assertEqual(canonical_bubbles[0]["text_direction"], "horizontal")
+
+    def test_cloud_is_filled_single_contour_and_burst_controls_change_shape(self):
+        cloud = self.bubble("云朵思考框", text="")
+        _, _, cloud_mask, _, _ = self.render([cloud])
+        mask = cloud_mask[0].numpy() > .5
+        self.assertTrue(mask[60, 80])
+        background = ~mask
+        reachable = background.copy()
+        reachable[:] = False
+        queue = deque()
+        for y in range(background.shape[0]):
+            for x in (0, background.shape[1] - 1):
+                if background[y, x] and not reachable[y, x]: reachable[y, x] = True; queue.append((y, x))
+        for x in range(background.shape[1]):
+            for y in (0, background.shape[0] - 1):
+                if background[y, x] and not reachable[y, x]: reachable[y, x] = True; queue.append((y, x))
+        while queue:
+            y, x = queue.popleft()
+            for next_y, next_x in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)):
+                if 0 <= next_y < background.shape[0] and 0 <= next_x < background.shape[1] and background[next_y, next_x] and not reachable[next_y, next_x]:
+                    reachable[next_y, next_x] = True; queue.append((next_y, next_x))
+        self.assertFalse((background & ~reachable).any())
+
+        few_lobes = cloud | {"cloud_lobes": 6, "cloud_depth": .05}
+        many_lobes = cloud | {"cloud_lobes": 16, "cloud_depth": .30}
+        few_lobes_mask = self.render([few_lobes])[2]
+        many_lobes_mask = self.render([many_lobes])[2]
+        self.assertFalse(torch.equal(few_lobes_mask, many_lobes_mask))
+
+        shallow = self.bubble("爆炸喊话框", text="") | {"spike_count": 6, "spike_depth": .05}
+        deep = self.bubble("爆炸喊话框", text="") | {"spike_count": 32, "spike_depth": .70}
+        shallow_mask = self.render([shallow])[2]
+        deep_mask = self.render([deep])[2]
+        self.assertFalse(torch.equal(shallow_mask, deep_mask))
+
+    def test_reference_explosion_and_flash_are_distinct_renderable_shapes(self):
+        explosion = self.bubble("爆炸对话框", text="") | {"x": .5, "y": .5, "w": .45, "h": .55}
+        flash = self.bubble("闪光对话框", text="") | {"x": .5, "y": .5, "w": .45, "h": .55, "border_width": 3}
+        explosion_mask = self.render([explosion])[2]
+        flash_output, _, flash_mask, _, _ = self.render([flash])
+        self.assertGreater(float(explosion_mask.max()), 0.0)
+        self.assertGreater(float(flash_mask.max()), 0.0)
+        self.assertFalse(torch.equal(explosion_mask, flash_mask))
+        self.assertFalse(torch.equal(flash_output, self.image))
+
+        no_rays = self.render([flash | {"border_width": 0}])[2]
+        self.assertLess(float(no_rays.sum()), float(flash_mask.sum()))
+
+        self.image = torch.zeros((1, 240, 320, 3), dtype=torch.float32)
+        gradient = self.render([flash | {"fill_color": "#ffffff", "border_width": 0}])[0][0]
+        center = float(gradient[120, 160].mean())
+        fading_edge = float(gradient[120, 220].mean())
+        canvas = float(gradient[120, 236].mean())
+        self.assertGreater(center, fading_edge)
+        self.assertGreater(fading_edge, canvas)
+
+        self.image = torch.ones((1, 240, 320, 3), dtype=torch.float32)
+        inward_rays = self.render([flash | {"fill_color": "#ffffff", "border_width": 3}])[0][0]
+        without_rays = self.render([flash | {"fill_color": "#ffffff", "border_width": 0}])[0][0]
+        inward_region = (slice(116, 125), slice(202, 211), slice(None))
+        self.assertLess(float(inward_rays[inward_region].min()), float(without_rays[inward_region].min()) - .5)
+
+    def test_burst_parameter_defaults_and_limits(self):
+        default_bubbles, _ = parse_bubble_data(
+            '{"version":1,"bubbles":[{"shape":"爆炸喊话框"}]}', self.font,
+        )
+        self.assertEqual(default_bubbles[0]["spike_count"], 16)
+        self.assertAlmostEqual(default_bubbles[0]["spike_depth"], .22)
+        self.assertEqual(default_bubbles[0]["cloud_lobes"], 10)
+        self.assertAlmostEqual(default_bubbles[0]["cloud_depth"], .14)
+        limits, _ = parse_bubble_data(
+            '{"version":1,"bubbles":['
+            '{"shape":"爆炸喊话框","spike_count":6,"spike_depth":0.05},'
+            '{"shape":"爆炸喊话框","spike_count":32,"spike_depth":0.70}]}', self.font,
+        )
+        self.assertEqual((limits[0]["spike_count"], limits[1]["spike_count"]), (6, 32))
+        self.assertEqual((limits[0]["spike_depth"], limits[1]["spike_depth"]), (.05, .70))
+
+    def test_vertical_text_supports_both_column_directions(self):
+        bubble = self.bubble("椭圆对白框", text="甲乙丙丁戊己庚辛") | {"x": .5, "y": .5, "w": .35, "h": .5, "font_size": 28}
+        left_to_right = self.render([bubble | {"text_direction": "vertical_ltr"}])[3]
+        right_to_left = self.render([bubble | {"text_direction": "vertical_rtl"}])[3]
+        horizontal = self.render([bubble | {"text_direction": "horizontal"}])[3]
+        self.assertGreater(float(left_to_right.max()), 0.0)
+        self.assertFalse(torch.equal(left_to_right, right_to_left))
+        self.assertFalse(torch.equal(left_to_right, horizontal))
+
+    def test_missing_chinese_glyphs_use_a_compatible_fallback_font(self):
+        latin_only = next(
+            (token for token in font_options() if font_for_text(token, "中文") != token),
+            None,
+        )
+        if latin_only is None:
+            self.skipTest("没有可用于验证中文回退的纯西文字体")
+        fallback = font_for_text(latin_only, "中文台词")
+        self.assertNotEqual(fallback, latin_only)
+        bubble = self.bubble("椭圆对白框", text="中文台词") | {"font_name": latin_only}
+        self.assertGreater(float(self.render([bubble])[3].max()), 0.0)
+
+    def test_overlapping_bubbles_can_share_one_outer_outline(self):
+        self.image = torch.ones((1, 240, 320, 3), dtype=torch.float32)
+        left = self.bubble("椭圆对白框", text="") | {"x": .42, "y": .5, "w": .5, "h": .4, "border_width": 8}
+        right = self.bubble("椭圆对白框", 1, text="") | {"x": .58, "y": .5, "w": .5, "h": .4, "border_width": 8}
+        separate = self.render([left, right], merge_overlaps=False)[0]
+        merged, _, merged_mask, _, canonical = self.render([left, right], merge_overlaps=True)
+        overlap_boundary = (slice(None), slice(116, 125), slice(101, 112), slice(None))
+        self.assertGreater(float(merged[overlap_boundary].mean()), float(separate[overlap_boundary].mean()) + .2)
+        self.assertGreater(float(merged_mask.max()), 0.0)
+        self.assertTrue(json.loads(canonical)["merge_overlaps"])
+
+        styled_left = left | {"fill_color": "#ffdddd", "border_width": 0}
+        styled_right = right | {"fill_color": "#336699", "border_width": 0}
+        unified = self.render([styled_left, styled_right], merge_overlaps=True)[0][0]
+        self.assertTrue(torch.allclose(unified[120, 80], unified[120, 240], atol=.01))
+        self.assertTrue(torch.allclose(unified[120, 160], unified[120, 240], atol=.01))
 
     def test_execution_returns_original_input_preview_metadata(self):
         bubble = self.bubble("椭圆对白框")
@@ -326,6 +472,7 @@ class ComicBubbleTests(unittest.TestCase):
         bubbles, canonical = parse_bubble_data("", self.font)
         self.assertEqual(bubbles, [])
         self.assertEqual(json.loads(canonical)["version"], 1)
+        self.assertFalse(json.loads(canonical)["merge_overlaps"])
         invalid = (
             ('{"bubbles":[]}', "version"),
             ('{"version":1,"bubbles":{}}', "bubbles"),
@@ -333,6 +480,18 @@ class ComicBubbleTests(unittest.TestCase):
             ('{"version":1,"bubbles":[{"opacity":2}]}', "0.0 到 1.0"),
             ('{"version":1,"bubbles":[{"x":"Infinity"}]}', "有限数值"),
             ('{"version":1,"bubbles":[{"fill_color":"oops"}]}', "颜色"),
+            ('{"version":1,"bubbles":[{"spike_count":5}]}', "6 到 32"),
+            ('{"version":1,"bubbles":[{"spike_count":33}]}', "6 到 32"),
+            ('{"version":1,"bubbles":[{"spike_count":16.5}]}', "必须是整数"),
+            ('{"version":1,"bubbles":[{"spike_depth":0.04}]}', "0.05 到 0.7"),
+            ('{"version":1,"bubbles":[{"spike_depth":0.71}]}', "0.05 到 0.7"),
+            ('{"version":1,"bubbles":[{"cloud_lobes":5}]}', "6 到 16"),
+            ('{"version":1,"bubbles":[{"cloud_lobes":17}]}', "6 到 16"),
+            ('{"version":1,"bubbles":[{"cloud_lobes":10.5}]}', "必须是整数"),
+            ('{"version":1,"bubbles":[{"cloud_depth":0.04}]}', "0.05 到 0.3"),
+            ('{"version":1,"bubbles":[{"cloud_depth":0.31}]}', "0.05 到 0.3"),
+            ('{"version":1,"merge_overlaps":"true","bubbles":[]}', "merge_overlaps 必须是布尔值"),
+            ('{"version":1,"bubbles":[{"text_direction":"diagonal"}]}', "文字方向无效"),
         )
         for value, message in invalid:
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, message):
@@ -352,7 +511,7 @@ class ComicFrontendTests(unittest.TestCase):
         for feature in ("layout_overrides", "canvas_width", "canvas_height", "1024 × 1536"):
             self.assertIn(feature, editor)
         for feature in (
-            "绘制画框", "自由画框", "画布与间距", "画框与镜头", "页面样式",
+            "添加画框", "自由画框", "switchToCustomLayout", "画布与间距", "画框与镜头", "页面样式",
             "tut-comic-monitor", "tut-comic-sidebar", "tut-comic-sidebar-tabs", "tut-comic-workspace",
             "border-radius:0", "Math.max(node.size?.[0] || 0, 1100)", "tut-comic-fields", "16:9", "9:16",
             "强制页边距", "remapOverrides", "pageBounds", "input_previews", "drawPreview", "__tutComicSetPreviews",
@@ -365,18 +524,68 @@ class ComicFrontendTests(unittest.TestCase):
             "镜头图层", "置于顶层", "上移一层", "下移一层", "置于底层", "恢复默认顺序", "layer_orders", "moveSelectedLayer", "renderLayerList",
         ):
             self.assertIn(feature, canvas)
+        self.assertNotIn("drawBtn.disabled = !free", canvas)
+        self.assertNotIn("deleteBtn.disabled = !free", canvas)
         for feature in (
             "tut-bubble-workspace", "tut-bubble-monitor", "tut-bubble-sidebar", "tut-bubble-tabs",
             "内容", "样式", "图层", "添加对话框", "置于顶层", "置于底层", "对话框图层",
             "input_previews", "__tutBubbleSetPreviews", "drawBubbleText", "drawBubblePath",
+            "搜索字体名称或路径", "未找到匹配字体", "当前字体未改变", "filterFonts", "hideStore(fontWidget)",
+            "尖角数量", "尖角深度", "spike_count", "spike_depth", "tut-bubble-burst",
+            "云瓣数量", "云瓣起伏", "cloud_lobes", "cloud_depth", "tut-bubble-cloud",
+            "store.options.hidden = true", "store.draw = () => {}",
+            "quadraticCurveTo", "function drawCanvas",
+            "合并重叠边框", "merge_overlaps", "相交气泡合为一个轮廓", "最上层气泡的外观",
+            "text_direction", "vertical_ltr", "vertical_rtl", "竖排列方向", "列从左到右", "列从右到左",
+            "爆炸对话框", "闪光对话框", "drawFlashRays", "drawFlashFill", "createRadialGradient", "bezierCurveTo", "rayCount = 96",
+            "/tut_nodes/fonts/catalog", "/tut_nodes/fonts/file", "FontFace", "document.fonts.add",
+            "preview_family", "预览已使用所选字体", "旧路径字体无法在浏览器预览",
         ):
             self.assertIn(feature, editor)
+        self.assertNotIn("context.arc", editor)
         for removed in ("tail_x", "tail_y", "调整尾巴", "黄色圆点"):
             self.assertNotIn(removed, editor)
         for removed in ("X%", "Y%", "宽%", "高%", "#ffd400"):
             self.assertNotIn(removed, canvas)
         for field in ("panel_data", "bubble_data", "page_margin", "empty_fill", "default_font"):
             self.assertIn(f"{field}:", labels)
+
+    def test_bubble_drag_only_redraws_canvas(self):
+        plugin_root = Path(__file__).resolve().parents[1]
+        editor = (plugin_root / "js" / "tut_comic_editors.js").read_text(encoding="utf-8")
+        bubble_editor = editor.index("function installBubbleEditor")
+        move_start = editor.index("const move = (event) =>", bubble_editor)
+        move_end = editor.index("const up = (event) =>", move_start)
+        move_handler = editor[move_start:move_end]
+        self.assertIn("drawCanvas();", move_handler)
+        self.assertNotIn("render();", move_handler)
+        self.assertNotIn("filterFonts", move_handler)
+        self.assertNotIn("renderLayerList", move_handler)
+
+    def test_normal_bubble_draw_does_not_treat_foreach_array_as_draw_options(self):
+        plugin_root = Path(__file__).resolve().parents[1]
+        editor = (plugin_root / "js" / "tut_comic_editors.js").read_text(encoding="utf-8")
+        self.assertIn("data.bubbles.forEach((bubble, index) => drawBubble(bubble, index));", editor)
+        self.assertNotIn("data.bubbles.forEach(drawBubble);", editor)
+
+    def test_bubble_preview_never_draws_text_with_generic_sans_serif(self):
+        plugin_root = Path(__file__).resolve().parents[1]
+        editor = (plugin_root / "js" / "tut_comic_editors.js").read_text(encoding="utf-8")
+        start = editor.index("function drawBubbleText")
+        end = editor.index("function installBubbleEditor", start)
+        text_renderer = editor[start:end]
+        self.assertIn("loadedComicFontFamily", text_renderer)
+        self.assertNotIn("sans-serif", text_renderer)
+
+    def test_preview_scales_pixel_sizes_from_source_image_to_editor_canvas(self):
+        plugin_root = Path(__file__).resolve().parents[1]
+        editor = (plugin_root / "js" / "tut_comic_editors.js").read_text(encoding="utf-8")
+        self.assertIn("sourceFontSize * previewScale", editor)
+        self.assertIn("2 * previewScale", editor)
+        self.assertIn("scaledBorderWidth = (style.border_width || 0) * previewScale", editor)
+        self.assertIn("nextWidth / naturalWidth", editor)
+        self.assertIn("nextHeight / naturalHeight", editor)
+        self.assertNotIn("Math.min(72, Number(bubble.font_size)", editor)
 
 
 if __name__ == "__main__":

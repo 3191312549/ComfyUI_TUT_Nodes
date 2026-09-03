@@ -225,7 +225,7 @@ function installComicCanvas(node) {
     const tools = document.createElement("div"); tools.className = "tut-comic-tools";
     const layout = makeSelect([AUTO_LAYOUT, ...Object.keys(PANEL_LAYOUTS)]);
     const frameBtn = makeButton("▭ 调整画框"), cameraBtn = makeButton("＋ 调整镜头");
-    const drawBtn = makeButton("✎ 绘制画框", "自由画框模式下拖动空白处创建画框");
+    const drawBtn = makeButton("＋ 添加画框", "点击后自动切换到自由画框，再在画布空白处拖动创建画框");
     const deleteBtn = makeButton("删除画框"), resetBtn = makeButton("恢复当前模板");
     const snapToggle = document.createElement("label"); snapToggle.className = "tut-comic-row";
     const snapCheck = document.createElement("input"); snapCheck.type = "checkbox"; snapCheck.checked = snapEnabled;
@@ -366,6 +366,19 @@ function installComicCanvas(node) {
         const name = layoutName();
         if (!data.quad_overrides[name]) data.quad_overrides[name] = resolvedQuads(name);
         return data.quad_overrides[name];
+    }
+    function switchToCustomLayout() {
+        if (layout.value === CUSTOM_LAYOUT) return;
+        const sourceName = layoutName();
+        const quads = clone(resolvedQuads(sourceName));
+        const order = [...layerOrder(sourceName)];
+        data.quad_overrides[CUSTOM_LAYOUT] = quads;
+        delete data.layout_overrides[CUSTOM_LAYOUT];
+        data.layer_orders[CUSTOM_LAYOUT] = order;
+        layout.value = CUSTOM_LAYOUT;
+        setWidget("layout", CUSTOM_LAYOUT);
+        selected = Math.max(0, Math.min(selected, quads.length - 1));
+        drawMode = false;
     }
     function layerOrder(name = layoutName()) {
         const count = resolvedQuads(name).length;
@@ -628,7 +641,9 @@ function installComicCanvas(node) {
         overlay.style.cursor = drawMode ? "crosshair" : mode === "camera" ? (moving?.camera ? "grabbing" : "grab")
             : resizing?.edge !== undefined ? edgeCursor(resizing.quad, resizing.edge)
             : hoveredCanvasEdge ? edgeCursor(quads[hoveredCanvasEdge.index], hoveredCanvasEdge.edge) : "move";
-        const free = layout.value === CUSTOM_LAYOUT; drawBtn.disabled = !free || quads.length >= MAX_PANELS; deleteBtn.disabled = !free || quads.length <= 1;
+        drawBtn.disabled = false; deleteBtn.disabled = false;
+        drawBtn.title = quads.length >= MAX_PANELS ? `每页最多 ${MAX_PANELS} 个画框` : "点击后自动切换到自由画框，再在画布空白处拖动创建画框";
+        deleteBtn.title = quads.length <= 1 ? "至少保留一个画框；点击仍会切换到自由画框" : "删除当前画框并自动切换到自由画框";
         renderLayerList(quads);
     }
     function point(event) {
@@ -757,8 +772,21 @@ function installComicCanvas(node) {
     layout.addEventListener("change", () => { setWidget("layout", layout.value); selected = 0; drawMode = false; writeData(); });
     frameBtn.addEventListener("click", () => { mode = "frame"; drawMode = false; snapGuides = []; draw(); });
     cameraBtn.addEventListener("click", () => { mode = "camera"; drawMode = false; snapGuides = []; draw(); });
-    drawBtn.addEventListener("click", () => { if (!drawBtn.disabled) { mode = "frame"; drawMode = !drawMode; draw(); } });
-    deleteBtn.addEventListener("click", () => { if (!deleteBtn.disabled) { const name = layoutName(), removed = selected, order = layerOrder(name).filter((index) => index !== removed).map((index) => index > removed ? index - 1 : index); editableQuads().splice(removed, 1); data.layer_orders[name] = order; selected = Math.max(0, removed - 1); writeData(); } });
+    drawBtn.addEventListener("click", () => {
+        switchToCustomLayout(); mode = "frame";
+        drawMode = resolvedQuads(CUSTOM_LAYOUT).length < MAX_PANELS ? !drawMode : false;
+        writeData();
+    });
+    deleteBtn.addEventListener("click", () => {
+        switchToCustomLayout(); mode = "frame"; drawMode = false;
+        const name = CUSTOM_LAYOUT, quads = editableQuads();
+        if (quads.length > 1) {
+            const removed = selected;
+            const order = layerOrder(name).filter((index) => index !== removed).map((index) => index > removed ? index - 1 : index);
+            quads.splice(removed, 1); data.layer_orders[name] = order; selected = Math.max(0, removed - 1);
+        }
+        writeData();
+    });
     resetBtn.addEventListener("click", () => { const name = layoutName(); delete data.quad_overrides[name]; delete data.layout_overrides[name]; delete data.layer_orders[name]; if (name === CUSTOM_LAYOUT) data.layout_overrides[name] = clone(PANEL_LAYOUTS[name]); selected = 0; writeData(); });
     snapCheck.addEventListener("change", () => { snapEnabled = snapCheck.checked; snapGuides = []; writeData(); });
     gridCheck.addEventListener("change", draw);

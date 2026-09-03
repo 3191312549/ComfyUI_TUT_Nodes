@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from .fonts import DEFAULT_FONT_TOKEN, load_font
+from .fonts import DEFAULT_FONT_TOKEN, font_for_text, load_font
 from .imaging import (
     image_tensor_to_pil_batch,
     pil_batch_to_image_tensor,
@@ -21,7 +21,10 @@ from .text_layout import measure_text_layout, render_layout_mask
 
 
 PANEL_SCHEMA_VERSION = 1
+MAX_CUSTOM_PANELS = 20
+AUTO_PANELS_PER_PAGE = 6
 BUBBLE_SCHEMA_VERSION = 1
+BUBBLE_TEXT_DIRECTIONS = ("horizontal", "vertical_ltr", "vertical_rtl")
 
 AUTO_LAYOUT = "自动匹配数量"
 CUSTOM_LAYOUT = "自由画框"
@@ -61,7 +64,14 @@ PANEL_LAYOUTS: dict[str, tuple[tuple[float, float, float, float], ...]] = {
     CUSTOM_LAYOUT: ((0.08, 0.08, 0.92, 0.92),),
 }
 
-BUBBLE_SHAPES = ("椭圆对白框", "圆角矩形", "云朵思考框", "爆炸喊话框", "方形旁白框", "无边框文字")
+BUBBLE_SHAPES = (
+    "椭圆对白框", "圆角矩形", "云朵思考框", "爆炸喊话框",
+    "爆炸对话框", "闪光对话框", "方形旁白框", "无边框文字",
+)
+BUBBLE_SPIKE_COUNT_DEFAULT = 16
+BUBBLE_SPIKE_DEPTH_DEFAULT = 0.22
+BUBBLE_CLOUD_LOBES_DEFAULT = 10
+BUBBLE_CLOUD_DEPTH_DEFAULT = 0.14
 
 
 def _parse_hex(value: str) -> tuple[int, int, int]:
@@ -167,8 +177,8 @@ def _parse_panel_config(value: str) -> tuple[
     raw_panels = parsed.get("panels", [])
     if not isinstance(raw_panels, list):
         raise ValueError("分镜配置 panels 必须是数组")
-    if len(raw_panels) > 6:
-        raise ValueError("每页最多只能配置 6 个画格")
+    if len(raw_panels) > MAX_CUSTOM_PANELS:
+        raise ValueError(f"每页最多只能配置 {MAX_CUSTOM_PANELS} 个画格")
     panels: list[dict[str, Any]] = []
     for index, raw in enumerate(raw_panels):
         if not isinstance(raw, dict):
@@ -208,7 +218,7 @@ def _parse_panel_config(value: str) -> tuple[
             "open_edges": open_edges,
             **overflow,
         })
-    while len(panels) < 6:
+    while len(panels) < MAX_CUSTOM_PANELS:
         panels.append({
             "focus_x": 0.5, "focus_y": 0.5, "zoom": 1.0, "flip": False,
             "open_edges": [False, False, False, False],
@@ -224,8 +234,8 @@ def _parse_panel_config(value: str) -> tuple[
         if layout_name not in PANEL_LAYOUTS:
             raise ValueError(f"分镜配置包含未知模板：{layout_name}")
         if layout_name == CUSTOM_LAYOUT:
-            if not isinstance(raw_rectangles, list) or not 1 <= len(raw_rectangles) <= 6:
-                raise ValueError("自由画框的数量必须为 1 到 6")
+            if not isinstance(raw_rectangles, list) or not 1 <= len(raw_rectangles) <= MAX_CUSTOM_PANELS:
+                raise ValueError(f"自由画框的数量必须为 1 到 {MAX_CUSTOM_PANELS}")
         elif not isinstance(raw_rectangles, list) or len(raw_rectangles) != len(PANEL_LAYOUTS[layout_name]):
             raise ValueError(f"{layout_name} 的自定义画框数量必须为 {len(PANEL_LAYOUTS[layout_name])}")
         rectangles = []
@@ -251,8 +261,8 @@ def _parse_panel_config(value: str) -> tuple[
         if layout_name not in PANEL_LAYOUTS:
             raise ValueError(f"四边形配置包含未知模板：{layout_name}")
         if layout_name == CUSTOM_LAYOUT:
-            if not isinstance(raw_layout_quads, list) or not 1 <= len(raw_layout_quads) <= 6:
-                raise ValueError("自由画框的四边形数量必须为 1 到 6")
+            if not isinstance(raw_layout_quads, list) or not 1 <= len(raw_layout_quads) <= MAX_CUSTOM_PANELS:
+                raise ValueError(f"自由画框的四边形数量必须为 1 到 {MAX_CUSTOM_PANELS}")
         elif not isinstance(raw_layout_quads, list) or len(raw_layout_quads) != len(PANEL_LAYOUTS[layout_name]):
             raise ValueError(f"{layout_name} 的四边形数量必须为 {len(PANEL_LAYOUTS[layout_name])}")
         quad_overrides[layout_name] = tuple(
@@ -349,8 +359,16 @@ def _position_image(source: Image.Image, size: tuple[int, int], mode: str, setti
 def _fit_image(source: Image.Image, size: tuple[int, int], mode: str, settings: dict[str, Any], background) -> Image.Image:
     resized, paste_x, paste_y = _position_image(source, size, mode, settings)
     result = Image.new("RGB", size, background)
-    result.paste(resized, (paste_x, paste_y))
+    alpha = resized.getchannel("A") if resized.mode == "RGBA" else None
+    result.paste(resized, (paste_x, paste_y), alpha)
     return result
+
+
+def _placed_source_alpha(source: Image.Image, canvas_size, position) -> Image.Image:
+    alpha = source.getchannel("A") if source.mode == "RGBA" else Image.new("L", source.size, 255)
+    placed = Image.new("L", canvas_size, 0)
+    placed.paste(alpha, position)
+    return placed
 
 
 def _quad_pixel_points(quad, width: int, height: int, margin: int, label: str):
@@ -450,7 +468,9 @@ def _render_quad_source(canvas, panel_mask, border_mask, source, geometry, setti
     resized, offset_x, offset_y = _position_image(source, target_size, mode, settings)
     paste_x, paste_y = left + offset_x, top + offset_y
     image_layer = Image.new("RGB", canvas.size, background)
-    image_layer.paste(resized, (paste_x, paste_y))
+    source_alpha = resized.getchannel("A") if resized.mode == "RGBA" else None
+    image_layer.paste(resized, (paste_x, paste_y), source_alpha)
+    placed_alpha = _placed_source_alpha(resized, canvas.size, (paste_x, paste_y))
 
     display_mask = geometry["inner"]
     open_edges = settings.get("open_edges", (False, False, False, False))
@@ -469,9 +489,10 @@ def _render_quad_source(canvas, panel_mask, border_mask, source, geometry, setti
         overflow = ImageChops.multiply(overflow, presence)
         display_mask = ImageChops.lighter(display_mask, overflow)
 
-    canvas.paste(image_layer, (0, 0), display_mask)
+    effective_mask = ImageChops.multiply(display_mask, placed_alpha)
+    canvas.paste(image_layer, (0, 0), effective_mask)
     panel_mask.paste(255, (0, 0), ImageChops.lighter(panel_mask, display_mask))
-    border_mask.paste(ImageChops.subtract(border_mask, display_mask))
+    border_mask.paste(ImageChops.subtract(border_mask, effective_mask))
 
 
 def render_comic_panels(
@@ -479,7 +500,7 @@ def render_comic_panels(
     gutter: int, border_width: int, border_color: str, background_color: str,
     fit_mode: str, empty_fill: str, panel_data: str,
 ):
-    frames = image_tensor_to_pil_batch(image)
+    frames = image_tensor_to_pil_batch(image, preserve_alpha=True)
     width, height = int(canvas_width), int(canvas_height)
     margin, gap, stroke = int(page_margin), int(gutter), int(border_width)
     if width < 64 or height < 64:
@@ -499,8 +520,8 @@ def render_comic_panels(
 
     pages: list[tuple[str, list[Image.Image | None]]] = []
     if layout == AUTO_LAYOUT:
-        for start in range(0, len(frames), 6):
-            chunk = frames[start:start + 6]
+        for start in range(0, len(frames), AUTO_PANELS_PER_PAGE):
+            chunk = frames[start:start + AUTO_PANELS_PER_PAGE]
             pages.append((_auto_layout(len(chunk)), list(chunk)))
     else:
         capacity = len(quad_overrides.get(layout, layout_overrides.get(layout, PANEL_LAYOUTS[layout])))
@@ -596,13 +617,24 @@ def render_comic_panels(
                             visible_left - paste_x, visible_top - paste_y,
                             visible_right - paste_x, visible_bottom - paste_y,
                         ))
-                        canvas.paste(crop, (visible_left, visible_top))
-                        panel_draw.rectangle(
-                            (visible_left, visible_top, visible_right - 1, visible_bottom - 1), fill=255
-                        )
-                        border_draw.rectangle(
-                            (visible_left, visible_top, visible_right - 1, visible_bottom - 1), fill=0
-                        )
+                        crop_alpha = crop.getchannel("A") if crop.mode == "RGBA" else None
+                        canvas.paste(crop, (visible_left, visible_top), crop_alpha)
+                        if crop_alpha is None:
+                            panel_draw.rectangle(
+                                (visible_left, visible_top, visible_right - 1, visible_bottom - 1), fill=255
+                            )
+                            border_draw.rectangle(
+                                (visible_left, visible_top, visible_right - 1, visible_bottom - 1), fill=0
+                            )
+                        else:
+                            panel_mask.paste(255, (visible_left, visible_top), crop_alpha)
+                            current_border = border_mask.crop(
+                                (visible_left, visible_top, visible_right, visible_bottom)
+                            )
+                            border_mask.paste(
+                                ImageChops.subtract(current_border, crop_alpha),
+                                (visible_left, visible_top),
+                            )
         outputs.append(canvas)
         panel_masks.append(panel_mask)
         border_masks.append(border_mask)
@@ -612,10 +644,15 @@ def render_comic_panels(
     )
 
 
-def parse_bubble_data(value: str, default_font: str = DEFAULT_FONT_TOKEN) -> tuple[list[dict[str, Any]], str]:
+def _parse_bubble_document(
+    value: str, default_font: str = DEFAULT_FONT_TOKEN,
+) -> tuple[list[dict[str, Any]], bool, str]:
     parsed = _decode_object(value, "对话框配置")
     if parsed and parsed.get("version") != BUBBLE_SCHEMA_VERSION:
         raise ValueError(f"对话框配置 version 必须为 {BUBBLE_SCHEMA_VERSION}")
+    merge_overlaps = parsed.get("merge_overlaps", False)
+    if not isinstance(merge_overlaps, bool):
+        raise ValueError("对话框配置 merge_overlaps 必须是布尔值")
     raw_bubbles = parsed.get("bubbles", [])
     if not isinstance(raw_bubbles, list):
         raise ValueError("对话框配置 bubbles 必须是数组")
@@ -628,8 +665,23 @@ def parse_bubble_data(value: str, default_font: str = DEFAULT_FONT_TOKEN) -> tup
         shape = str(raw.get("shape", "椭圆对白框"))
         if shape not in BUBBLE_SHAPES:
             raise ValueError(f"第 {index + 1} 个对话框形状无效：{shape}")
+        text_direction = str(raw.get("text_direction", "horizontal"))
+        if text_direction not in BUBBLE_TEXT_DIRECTIONS:
+            raise ValueError(f"第 {index + 1} 个对话框文字方向无效：{text_direction}")
         font_size = _finite_number(raw.get("font_size", 36), f"第 {index + 1} 个对话框字号", 8, 512)
         border_width = _finite_number(raw.get("border_width", 4), f"第 {index + 1} 个对话框边框", 0, 64)
+        spike_count_value = _finite_number(
+            raw.get("spike_count", BUBBLE_SPIKE_COUNT_DEFAULT),
+            f"第 {index + 1} 个爆炸框尖角数量", 6, 32,
+        )
+        if not spike_count_value.is_integer():
+            raise ValueError(f"第 {index + 1} 个爆炸框尖角数量必须是整数")
+        cloud_lobes_value = _finite_number(
+            raw.get("cloud_lobes", BUBBLE_CLOUD_LOBES_DEFAULT),
+            f"第 {index + 1} 个云朵框云瓣数量", 6, 16,
+        )
+        if not cloud_lobes_value.is_integer():
+            raise ValueError(f"第 {index + 1} 个云朵框云瓣数量必须是整数")
         bubble = {
             "id": str(raw.get("id", f"bubble-{index + 1}"))[:64],
             "shape": shape,
@@ -638,6 +690,7 @@ def parse_bubble_data(value: str, default_font: str = DEFAULT_FONT_TOKEN) -> tup
             "w": _finite_number(raw.get("w", 0.3), f"第 {index + 1} 个对话框宽度", 0.03, 1.0),
             "h": _finite_number(raw.get("h", 0.2), f"第 {index + 1} 个对话框高度", 0.03, 1.0),
             "text": str(raw.get("text", "")),
+            "text_direction": text_direction,
             "font_name": str(raw.get("font_name", default_font)),
             "font_size": int(round(font_size)),
             "text_color": str(raw.get("text_color", "#111111")),
@@ -645,12 +698,28 @@ def parse_bubble_data(value: str, default_font: str = DEFAULT_FONT_TOKEN) -> tup
             "border_color": str(raw.get("border_color", "#111111")),
             "border_width": int(round(border_width)),
             "opacity": _finite_number(raw.get("opacity", 1.0), f"第 {index + 1} 个对话框透明度", 0.0, 1.0),
+            "spike_count": int(spike_count_value),
+            "spike_depth": _finite_number(
+                raw.get("spike_depth", BUBBLE_SPIKE_DEPTH_DEFAULT),
+                f"第 {index + 1} 个爆炸框尖角深度", 0.05, 0.70,
+            ),
+            "cloud_lobes": int(cloud_lobes_value),
+            "cloud_depth": _finite_number(
+                raw.get("cloud_depth", BUBBLE_CLOUD_DEPTH_DEFAULT),
+                f"第 {index + 1} 个云朵框云瓣起伏", 0.05, 0.30,
+            ),
         }
         _parse_hex(bubble["text_color"]); _parse_hex(bubble["fill_color"]); _parse_hex(bubble["border_color"])
         bubbles.append(bubble)
     canonical = json.dumps(
-        {"version": BUBBLE_SCHEMA_VERSION, "bubbles": bubbles}, ensure_ascii=False, separators=(",", ":")
+        {"version": BUBBLE_SCHEMA_VERSION, "merge_overlaps": merge_overlaps, "bubbles": bubbles},
+        ensure_ascii=False, separators=(",", ":"),
     )
+    return bubbles, merge_overlaps, canonical
+
+
+def parse_bubble_data(value: str, default_font: str = DEFAULT_FONT_TOKEN) -> tuple[list[dict[str, Any]], str]:
+    bubbles, _, canonical = _parse_bubble_document(value, default_font)
     return bubbles, canonical
 
 
@@ -670,21 +739,104 @@ def _bubble_shape(size: tuple[int, int], bubble: dict[str, Any]) -> Image.Image:
         draw.rounded_rectangle(box, radius=max(2, min(box_w, box_h) // 6), fill=255)
     elif shape == "方形旁白框":
         draw.rectangle(box, fill=255)
+    elif shape == "闪光对话框":
+        left, top = max(0, math.floor(cx - box_w * .5)), max(0, math.floor(cy - box_h * .5))
+        right, bottom = min(width, math.ceil(cx + box_w * .5) + 1), min(height, math.ceil(cy + box_h * .5) + 1)
+        if right > left and bottom > top:
+            xs = (np.arange(left, right, dtype=np.float32) - cx) / box_w
+            ys = (np.arange(top, bottom, dtype=np.float32) - cy) / box_h
+            radius = np.sqrt(ys[:, None] ** 2 + xs[None, :] ** 2)
+            fade = np.clip((.50 - radius) / (.50 - .34), 0.0, 1.0)
+            fade = fade * fade * (3.0 - 2.0 * fade)
+            mask.paste(Image.fromarray(np.round(fade * 255).astype(np.uint8), "L"), (left, top))
     elif shape == "爆炸喊话框":
         points = []
-        for index in range(32):
-            angle = -math.pi / 2 + index * math.pi / 16
-            radius = 0.5 if index % 2 == 0 else 0.39
+        point_count = bubble["spike_count"] * 2
+        inner_radius = 0.5 * (1.0 - bubble["spike_depth"])
+        for index in range(point_count):
+            angle = -math.pi / 2 + index * math.tau / point_count
+            radius = 0.5 if index % 2 == 0 else inner_radius
             points.append((cx + math.cos(angle) * box_w * radius, cy + math.sin(angle) * box_h * radius))
         draw.polygon(points, fill=255)
+    elif shape == "爆炸对话框":
+        points = []
+
+        def cubic(start, control_a, control_b, end, samples=12):
+            for sample in range(samples):
+                t = sample / samples
+                inverse = 1.0 - t
+                points.append((
+                    inverse ** 3 * start[0] + 3 * inverse * inverse * t * control_a[0] + 3 * inverse * t * t * control_b[0] + t ** 3 * end[0],
+                    inverse ** 3 * start[1] + 3 * inverse * inverse * t * control_a[1] + 3 * inverse * t * t * control_b[1] + t ** 3 * end[1],
+                ))
+
+        def point(nx, ny):
+            return cx + nx * box_w, cy + ny * box_h
+
+        top_left = point(-.48, -.46)
+        cubic(top_left, point(-.39, -.39), point(-.30, -.34), point(-.22, -.36))
+        points.extend((point(-.17, -.35), point(-.23, -.40), point(-.13, -.36)))
+        cubic(point(-.13, -.36), point(.13, -.35), point(.34, -.42), point(.48, -.50))
+        cubic(point(.48, -.50), point(.45, -.40), point(.42, -.31), point(.43, -.25))
+        points.extend((point(.54, -.32), point(.45, -.18)))
+        cubic(point(.45, -.18), point(.41, -.02), point(.41, .13), point(.44, .22))
+        points.extend((point(.50, .16), point(.44, .31), point(.48, .48)))
+        cubic(point(.48, .48), point(.20, .37), point(-.18, .35), point(-.43, .49))
+        points.extend((point(-.35, .31), point(-.48, .36), point(-.41, .19)))
+        cubic(point(-.41, .19), point(-.38, .02), point(-.40, -.28), top_left)
+        draw.polygon(points, fill=255)
     else:
-        for index in range(12):
-            angle = index * math.pi / 6
-            px = cx + math.cos(angle) * box_w * 0.42
-            py = cy + math.sin(angle) * box_h * 0.38
-            radius = max(4, min(box_w, box_h) // 6)
-            draw.ellipse((px - radius, py - radius, px + radius, py + radius), fill=255)
-        draw.ellipse(box, fill=255)
+        points = []
+        lobe_count = bubble["cloud_lobes"]
+        cloud_depth = bubble["cloud_depth"]
+        base_valley_radius = 0.48 - 0.35 * cloud_depth
+        base_control_radius = 0.54 + 0.15 * cloud_depth
+        samples_per_lobe = 12
+        weights = [1.0 + .20 * math.sin(index * 2.17 + .3) + .10 * math.sin(index * .91 + 1.4) for index in range(lobe_count)]
+        angle_steps = [math.tau * weight / sum(weights) for weight in weights]
+        start_angle = -math.pi / 2 - angle_steps[0] / 2
+        current_angle = start_angle
+        for lobe in range(lobe_count):
+            angle_step = angle_steps[lobe]
+            start, middle, end = current_angle, current_angle + angle_step / 2, current_angle + angle_step
+            start_radius = base_valley_radius * (1.0 + .045 * math.sin(lobe * 1.73 + .5))
+            end_radius = base_valley_radius * (1.0 + .045 * math.sin((lobe + 1) * 1.73 + .5))
+            control_radius = base_control_radius * (1.0 + .12 * math.sin(lobe * 2.39 + .8))
+            p0 = (cx + math.cos(start) * box_w * start_radius, cy + math.sin(start) * box_h * start_radius)
+            control = (cx + math.cos(middle) * box_w * control_radius, cy + math.sin(middle) * box_h * control_radius)
+            p1 = (cx + math.cos(end) * box_w * end_radius, cy + math.sin(end) * box_h * end_radius)
+            for sample in range(samples_per_lobe):
+                t = sample / samples_per_lobe
+                inverse = 1.0 - t
+                points.append((
+                    inverse * inverse * p0[0] + 2 * inverse * t * control[0] + t * t * p1[0],
+                    inverse * inverse * p0[1] + 2 * inverse * t * control[1] + t * t * p1[1],
+                ))
+            current_angle = end
+        draw.polygon(points, fill=255)
+    return mask
+
+
+def _flash_border_mask(size: tuple[int, int], bubble: dict[str, Any]) -> Image.Image:
+    width, height = size
+    cx, cy = round(bubble["x"] * width), round(bubble["y"] * height)
+    box_w, box_h = max(2, round(bubble["w"] * width)), max(2, round(bubble["h"] * height))
+    mask = Image.new("L", size, 0)
+    if bubble["border_width"] <= 0:
+        return mask
+    draw = ImageDraw.Draw(mask)
+    ray_count = 96
+    angle_step = math.tau / ray_count
+    half_angle = angle_step * min(.32, .16 + bubble["border_width"] / 80)
+    for index in range(ray_count):
+        angle = -math.pi / 2 + index * angle_step
+        outer_radius = .47 + .03 * (.5 + .5 * math.sin(index * 2.07 + .4))
+        draw.polygon((
+            (cx + math.cos(angle) * box_w * .31, cy + math.sin(angle) * box_h * .31),
+            (cx + math.cos(angle - half_angle) * box_w * .40, cy + math.sin(angle - half_angle) * box_h * .40),
+            (cx + math.cos(angle) * box_w * outer_radius, cy + math.sin(angle) * box_h * outer_radius),
+            (cx + math.cos(angle + half_angle) * box_w * .40, cy + math.sin(angle + half_angle) * box_h * .40),
+        ), fill=255)
     return mask
 
 
@@ -696,19 +848,61 @@ def _text_mask(size: tuple[int, int], bubble: dict[str, Any]) -> Image.Image:
     if not bubble["text"]:
         return Image.new("L", size, 0)
     width, height = size
+    render_font_name = font_for_text(bubble["font_name"], bubble["text"])
     cx, cy = round(bubble["x"] * width), round(bubble["y"] * height)
     box_w, box_h = max(2, round(bubble["w"] * width)), max(2, round(bubble["h"] * height))
-    padding = max(3, round(min(box_w, box_h) * (0.15 if bubble["shape"] == "爆炸喊话框" else 0.1)))
+    padding = max(3, round(min(box_w, box_h) * (0.16 if bubble["shape"] in ("爆炸喊话框", "爆炸对话框", "闪光对话框") else 0.1)))
     region = (
         max(0, cx - box_w // 2 + padding), max(0, cy - box_h // 2 + padding),
         min(width, cx + (box_w + 1) // 2 - padding), min(height, cy + (box_h + 1) // 2 - padding),
     )
     if region[2] <= region[0] or region[3] <= region[1]:
         return Image.new("L", size, 0)
+    if bubble["text_direction"] != "horizontal":
+        region_width, region_height = region[2] - region[0], region[3] - region[1]
+        font_size = bubble["font_size"]
+
+        def vertical_columns(capacity: int) -> list[list[str]]:
+            columns = []
+            for paragraph in bubble["text"].split("\n"):
+                characters = list(paragraph)
+                if not characters:
+                    columns.append([])
+                else:
+                    columns.extend(characters[offset:offset + capacity] for offset in range(0, len(characters), capacity))
+            return columns
+
+        while True:
+            line_step = max(1, round(font_size * 1.15))
+            column_step = max(1, round(font_size * 1.15))
+            capacity = max(1, region_height // line_step)
+            columns = vertical_columns(capacity)
+            if len(columns) * column_step <= region_width or font_size <= 8:
+                break
+            font_size = max(8, font_size - 2)
+        max_columns = max(1, region_width // column_step)
+        columns = columns[:max_columns]
+        local = Image.new("L", (region_width, region_height), 0)
+        draw = ImageDraw.Draw(local)
+        font = load_font(render_font_name, font_size)
+        total_width = len(columns) * column_step
+        left = (region_width - total_width) / 2
+        for logical_index, characters in enumerate(columns):
+            visual_index = logical_index if bubble["text_direction"] == "vertical_ltr" else len(columns) - 1 - logical_index
+            x = left + (visual_index + .5) * column_step
+            column_height = len(characters) * line_step
+            top = (region_height - column_height) / 2
+            for row, character in enumerate(characters):
+                y = top + (row + .5) * line_step
+                bounds = draw.textbbox((0, 0), character, font=font)
+                draw.text((x - (bounds[0] + bounds[2]) / 2, y - (bounds[1] + bounds[3]) / 2), character, font=font, fill=255)
+        mask = Image.new("L", size, 0)
+        mask.paste(local, (region[0], region[1]))
+        return mask
     font_size = bubble["font_size"]
     while True:
         layout = measure_text_layout(
-            bubble["text"], bubble["font_name"], font_size, size, region=region,
+            bubble["text"], render_font_name, font_size, size, region=region,
             max_width=region[2] - region[0], line_spacing=max(0, round(font_size * 0.15)),
             justify="center", vertical_align="center",
         )
@@ -720,7 +914,7 @@ def _text_mask(size: tuple[int, int], bubble: dict[str, Any]) -> Image.Image:
 
 
 def render_speech_bubbles(image, enabled: bool, default_font: str, bubble_data: str):
-    bubbles, canonical = parse_bubble_data(bubble_data, default_font)
+    bubbles, merge_overlaps, canonical = _parse_bubble_document(bubble_data, default_font)
     if not enabled:
         batch = int(image.shape[0]) if getattr(image, "ndim", 0) == 4 else 1
         height, width = int(image.shape[-3]), int(image.shape[-2])
@@ -732,23 +926,85 @@ def render_speech_bubbles(image, enabled: bool, default_font: str, bubble_data: 
         canvas = source.copy()
         bubble_total = Image.new("L", source.size, 0)
         text_total = Image.new("L", source.size, 0)
+        layers = []
         for bubble in bubbles:
             opacity = bubble["opacity"]
             shape = _bubble_shape(source.size, bubble)
             border_width = bubble["border_width"]
-            outer = shape.filter(ImageFilter.MaxFilter(border_width * 2 + 1)) if border_width else shape
-            border = ImageChops.subtract(outer, shape) if border_width else Image.new("L", source.size, 0)
-            border_alpha, fill_alpha = _scaled_mask(border, opacity), _scaled_mask(shape, opacity)
-            if border.getbbox():
-                canvas = Image.composite(Image.new("RGB", source.size, _parse_hex(bubble["border_color"])), canvas, border_alpha)
-            if shape.getbbox():
-                canvas = Image.composite(Image.new("RGB", source.size, _parse_hex(bubble["fill_color"])), canvas, fill_alpha)
+            if bubble["shape"] == "闪光对话框":
+                border = _flash_border_mask(source.size, bubble)
+                outer = ImageChops.lighter(shape, border)
+            else:
+                outer = shape.filter(ImageFilter.MaxFilter(border_width * 2 + 1)) if border_width else shape
+                border = ImageChops.subtract(outer, shape) if border_width else Image.new("L", source.size, 0)
             text = _text_mask(source.size, bubble)
-            text_alpha = _scaled_mask(text, opacity)
-            if text.getbbox():
-                canvas = Image.composite(Image.new("RGB", source.size, _parse_hex(bubble["text_color"])), canvas, text_alpha)
-            bubble_total = Image.fromarray(np.maximum(np.asarray(bubble_total), np.asarray(_scaled_mask(outer, opacity))).astype(np.uint8), "L")
-            text_total = Image.fromarray(np.maximum(np.asarray(text_total), np.asarray(text_alpha)).astype(np.uint8), "L")
+            layers.append((bubble, shape, outer, border, text))
+
+        def composite(mask: Image.Image, color: str, opacity: float) -> None:
+            nonlocal canvas
+            if mask.getbbox():
+                canvas = Image.composite(
+                    Image.new("RGB", source.size, _parse_hex(color)), canvas, _scaled_mask(mask, opacity),
+                )
+
+        if merge_overlaps:
+            parents = list(range(len(layers)))
+
+            def find(index: int) -> int:
+                while parents[index] != index:
+                    parents[index] = parents[parents[index]]
+                    index = parents[index]
+                return index
+
+            def union(left: int, right: int) -> None:
+                left_root, right_root = find(left), find(right)
+                if left_root != right_root:
+                    parents[right_root] = left_root
+
+            for left in range(len(layers)):
+                left_box = layers[left][1].getbbox()
+                if not left_box or layers[left][0]["shape"] == "闪光对话框":
+                    continue
+                for right in range(left + 1, len(layers)):
+                    right_box = layers[right][1].getbbox()
+                    if not right_box or layers[right][0]["shape"] == "闪光对话框" or left_box[2] <= right_box[0] or right_box[2] <= left_box[0] or left_box[3] <= right_box[1] or right_box[3] <= left_box[1]:
+                        continue
+                    if ImageChops.multiply(layers[left][1], layers[right][1]).getbbox():
+                        union(left, right)
+
+            groups: dict[int, list[int]] = {}
+            for index in range(len(layers)):
+                groups.setdefault(find(index), []).append(index)
+            for indices in groups.values():
+                merged_shape = Image.new("L", source.size, 0)
+                for index in indices:
+                    merged_shape = ImageChops.lighter(merged_shape, layers[index][1])
+                style = layers[max(indices)][0]
+                if len(indices) == 1 and style["shape"] == "闪光对话框":
+                    merged_outer, border = layers[indices[0]][2], layers[indices[0]][3]
+                    composite(merged_shape, style["fill_color"], style["opacity"])
+                    composite(border, style["border_color"], style["opacity"])
+                else:
+                    border_width = style["border_width"]
+                    merged_outer = merged_shape.filter(ImageFilter.MaxFilter(border_width * 2 + 1)) if border_width else merged_shape
+                    border = ImageChops.subtract(merged_outer, merged_shape) if border_width else Image.new("L", source.size, 0)
+                    composite(border, style["border_color"], style["opacity"])
+                    composite(merged_shape, style["fill_color"], style["opacity"])
+                bubble_total = ImageChops.lighter(bubble_total, _scaled_mask(merged_outer, style["opacity"]))
+            for bubble, _, _, _, text in layers:
+                composite(text, bubble["text_color"], bubble["opacity"])
+                text_total = ImageChops.lighter(text_total, _scaled_mask(text, bubble["opacity"]))
+        else:
+            for bubble, shape, outer, border, text in layers:
+                if bubble["shape"] == "闪光对话框":
+                    composite(shape, bubble["fill_color"], bubble["opacity"])
+                    composite(border, bubble["border_color"], bubble["opacity"])
+                else:
+                    composite(border, bubble["border_color"], bubble["opacity"])
+                    composite(shape, bubble["fill_color"], bubble["opacity"])
+                composite(text, bubble["text_color"], bubble["opacity"])
+                bubble_total = ImageChops.lighter(bubble_total, _scaled_mask(outer, bubble["opacity"]))
+                text_total = ImageChops.lighter(text_total, _scaled_mask(text, bubble["opacity"]))
         outputs.append(canvas); bubble_masks.append(bubble_total); text_masks.append(text_total)
     return (
         pil_batch_to_image_tensor(outputs), pil_batch_to_mask_tensor(bubble_masks),

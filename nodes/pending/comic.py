@@ -5,6 +5,10 @@ from __future__ import annotations
 from ...categories import IMAGE_COMIC, PENDING_IMAGE_COMIC
 from ...core.comic import AUTO_LAYOUT, PANEL_LAYOUTS, render_comic_panels, render_speech_bubbles
 from ...core.fonts import font_options
+from ...web_routes import register_font_routes
+
+
+register_font_routes()
 
 
 class TUT_ComicPanelCanvas:
