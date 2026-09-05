@@ -5,6 +5,45 @@ from __future__ import annotations
 import asyncio
 
 
+def register_anima_artist_routes() -> bool:
+    """Register the read-only bundled Anima artist search endpoint."""
+
+    try:
+        from aiohttp import web
+        from server import PromptServer
+        from .core.anima_artists import search_anima_artists
+    except ImportError:
+        return False
+
+    prompt_server = getattr(PromptServer, "instance", None)
+    if prompt_server is None:
+        return False
+    routes = getattr(prompt_server, "routes", None)
+    if routes is None or not hasattr(routes, "get"):
+        return False
+    if getattr(prompt_server, "_tut_anima_artist_routes_registered", False):
+        return True
+
+    async def search_artists(request):
+        query = request.query.get("q", "")
+        limit = request.query.get("limit", "20")
+        try:
+            artists = await asyncio.to_thread(search_anima_artists, query, limit)
+            return web.json_response({"query": str(query), "artists": artists})
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except (RuntimeError, OSError) as exc:
+            return web.json_response({"error": str(exc), "code": "database_unavailable"}, status=503)
+
+    try:
+        routes.get("/tut_nodes/anima/artists/search")(search_artists)
+    except (AttributeError, RuntimeError):
+        return False
+
+    prompt_server._tut_anima_artist_routes_registered = True
+    return True
+
+
 def register_excel_routes() -> bool:
     """Register the Excel inspection endpoint when a PromptServer is available."""
 

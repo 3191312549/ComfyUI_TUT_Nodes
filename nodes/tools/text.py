@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ...categories import TOOLS_TEXT
+from ...core.anima_artists import mix_anima_artist_prompt
 from ...core.text_tools import decode_separator
 
 
@@ -66,5 +67,51 @@ class TUT_SplitTextBatch:
         return (items, len(items))
 
 
-NODE_CLASS_MAPPINGS = {"TUT_SplitTextBatch": TUT_SplitTextBatch}
-NODE_DISPLAY_NAME_MAPPINGS = {"TUT_SplitTextBatch": "TUT_文本分隔批次"}
+class TUT_AnimaArtistPromptMixer:
+    """Merge weighted artist tags into a prompt using Anima's official tag order."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "prompt": (
+                    "STRING",
+                    {
+                        "forceInput": True,
+                        "tooltip": "需要插入 Anima 画师标签的常规提示词。",
+                    },
+                ),
+                "artist_data": (
+                    "STRING",
+                    {
+                        "default": '{"version":1,"artists":[]}',
+                        "multiline": False,
+                        "tooltip": "画师胶囊数据；前端不可用时可直接编辑 JSON。",
+                    },
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("mixed_prompt",)
+    FUNCTION = "mix_prompt"
+    CATEGORY = TOOLS_TEXT
+    DESCRIPTION = "搜索并混合带权重的 Anima 画师标签，按官方顺序插入提示词，同时自动转换常用中文标点。"
+
+    def mix_prompt(self, prompt, artist_data):
+        return (mix_anima_artist_prompt(prompt, artist_data),)
+
+
+NODE_CLASS_MAPPINGS = {
+    "TUT_SplitTextBatch": TUT_SplitTextBatch,
+    "TUT_AnimaArtistPromptMixer": TUT_AnimaArtistPromptMixer,
+}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "TUT_SplitTextBatch": "TUT_文本分隔批次",
+    "TUT_AnimaArtistPromptMixer": "TUT_Anima画师提示词混合",
+}
+
+
+from ...web_routes import register_anima_artist_routes
+
+register_anima_artist_routes()

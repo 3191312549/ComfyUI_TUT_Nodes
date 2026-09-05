@@ -1,12 +1,18 @@
 # ComfyUI_TUT_Nodes
 
-一套以中文界面为主的 ComfyUI 实用节点。公开版包含 **63 个节点**，覆盖文字排版、图片调色、滤镜、抠像、合成、漫画分镜、音频裁剪、批次处理、Excel、LoRA 测试、潜空间放大和动画输出。
+一套以中文界面为主的 ComfyUI 实用节点。本页介绍公开版的 **64 个节点**，覆盖文字排版、图片调色、滤镜、抠像、合成、漫画分镜、漫画对话框、音频裁剪、批次处理、Excel、Anima 画师提示词、LoRA 测试、潜空间放大和动画输出。
 
 ![TUT_Nodes 功能总览](docs/images/overview.svg)
 
 ## 快速安装
 
-把仓库放入 ComfyUI 的 `custom_nodes` 目录：
+在 **ComfyUI 根目录**执行以下命令，将仓库下载到 `custom_nodes`：
+
+```shell
+git clone https://github.com/3191312549/ComfyUI_TUT_Nodes.git custom_nodes/ComfyUI_TUT_Nodes
+```
+
+也可以下载仓库 ZIP，解压后将文件夹改名为 `ComfyUI_TUT_Nodes`，放到以下位置（避免多套一层同名文件夹）：
 
 ```text
 ComfyUI/custom_nodes/ComfyUI_TUT_Nodes
@@ -15,12 +21,25 @@ ComfyUI/custom_nodes/ComfyUI_TUT_Nodes
 然后使用 **ComfyUI 自己的 Python 环境**安装依赖：
 
 ```powershell
-python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
+python -m pip install -r custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 ```
 
 重启 ComfyUI，在节点菜单中找到 `TUT_Nodes`。
 
-> `AI智能抠像` 需要额外安装 `rembg`；`GIMM-VFI补帧` 需要已安装 ComfyUI-GIMM-VFI。其他可选模型会在第一次执行对应节点时按需下载。
+上面的 `python` 必须指向运行 ComfyUI 的解释器；整合包或便携版请使用其自带 Python。主要依赖为 `uharfbuzz`、OpenCV 和 `openpyxl`，插件不会在加载时自动安装依赖。
+
+> `AI智能抠像` 需要额外安装 `rembg`；`GIMM-VFI补帧` 需要已安装并启用 ComfyUI-GIMM-VFI；SesquiLSR 权重会在首次执行对应格式时按需下载。Anima 画师库随插件内置，搜索与混合不需要联网。
+
+### 更新已安装的版本
+
+通过 Git 安装的用户，在 **ComfyUI 根目录**执行：
+
+```shell
+git -C custom_nodes/ComfyUI_TUT_Nodes pull --ff-only
+python -m pip install -r custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
+```
+
+更新后重启 ComfyUI，并刷新浏览器页面以加载新的节点界面。ZIP 安装的用户可备份自添字体、LUT 等文件后，用新版文件替换插件目录。
 
 ## 三分钟认识节点
 
@@ -42,6 +61,20 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 
 `图像到批次` 可把多张图片组成批次并送入 `漫画分镜画布`；Excel 节点可把表格内容转成文本列表；`LoRA强度批量测试` 可一次生成多档模型强度供下游对比。
 
+### 4. 混合 Anima 画师提示词
+
+连接方式：`文本提示词 → TUT_Anima画师提示词混合 → 文本编码节点`。
+
+在节点内搜索画师，点击结果加入画师胶囊，再为每位画师调整权重。内置画师库包含 **42,196 个画师标签**，支持模糊搜索，也可添加自定义画师；权重范围为 `0.1–3.0`，步长为 `0.1`。
+
+例如，输入 `1girl，smile`，添加权重 `1.0` 的 `wlop` 和权重 `1.2` 的 `望月けい`，画师部分会写为 `@wlop, (@望月けい:1.2)`。常用中文标点会转为英文标点，重复画师会合并，同名时以胶囊权重为准。
+
+节点根据标签结构尝试将画师放在角色、作品之后和通用描述之前；无法判断角色或作品边界时会追加到提示词末尾。输出是一段普通文本，可继续编辑后再交给文本编码节点。
+
+### 5. 试听并裁剪音频
+
+使用 `TUT_高级音频加载` 选择或上传音频，在波形上拖动选区两端调整起止时间，也可输入具体秒数。选区支持试听和播放定位；结束时间设为 `0` 表示保留到音频末尾。输出保留原采样率与声道，并提供裁剪时长和实际起止时间。
+
 ## 节点分类
 
 | 分类 | 适合做什么 | 代表节点 |
@@ -53,7 +86,7 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 | 图片 / 合成 | 柔边、光线包裹、深度、透视 | 柔边图层合成、四角定位合成 |
 | 图片 / 漫画 | 多图自动排版、分镜与对白 | 漫画分镜画布、漫画对话框 |
 | 音频 | 波形预览、试听与精确裁剪 | 高级音频加载 |
-| 工具 | Excel、文本、批次、等待、帮助 | 读取Excel、图像到批次、节点帮助 |
+| 工具 | Excel、画师提示词、文本、批次、等待、帮助 | Anima画师提示词混合、读取Excel、图像到批次 |
 | 模型与动画 | LoRA 对比、潜空间放大、补帧、GIF | LoRA强度批量测试、GIMM-VFI补帧 |
 
 ## 完整节点清单
@@ -129,10 +162,11 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 </details>
 
 <details>
-<summary><strong>工具（9）</strong></summary>
+<summary><strong>工具（10）</strong></summary>
 
 - `TUT_节点帮助`：连接任意节点输出，在节点内查看使用说明。
 - `TUT_文本分隔批次`：按分隔符把文本拆成列表。
+- `TUT_Anima画师提示词混合`：离线搜索并混合加权画师标签，自动去重、转换常用中文标点，并根据提示词结构选择插入位置。
 - `TUT_图像到批次`：合并最多十路图片输入，不拉伸不同尺寸图片。
 - `TUT_批次按编号加载`：按编号选择列表中的一项。
 - `TUT_等待`：延时后原样传递任意类型数据。
@@ -160,6 +194,8 @@ python -m pip install -r ComfyUI/custom_nodes/ComfyUI_TUT_Nodes/requirements.txt
 - 插件字体放入 `ComfyUI_TUT_Nodes/fonts` 后重启 ComfyUI；支持 `.ttf`、`.otf`、`.ttc`。
 - LUT 可放入 `ComfyUI_TUT_Nodes/luts`，也可在加载节点中上传。插件不会自动猜测 Log、Rec.709 或 ACES 色彩空间。
 - Excel 采用“读取一次、处理多次”的连接方式：先连接 `读取Excel`，再连接三个 Excel 处理节点。
+- `图像到批次` 最多连接十路 IMAGE；不同尺寸会居中补透明边，不拉伸原图。`批次按编号加载` 选择的是执行列表中的一项，不拆分 IMAGE 内部的图片批次。
+- 旧版 Excel 工作流若仍直接向处理节点传文件路径，需要添加 `读取Excel` 节点并重新连接。
 - SesquiLSR 模型首次使用时下载到 `models/TUT_Nodes/sesqui_lsr/`。第三方来源与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 许可

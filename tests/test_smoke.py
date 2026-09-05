@@ -61,6 +61,7 @@ EXPECTED_NODE_IDS = {
     "TUT_Halation", "TUT_LensDiffusion", "TUT_ColorCompressor",
     "TUT_NodeHelp",
     "TUT_SplitTextBatch",
+    "TUT_AnimaArtistPromptMixer",
     "TUT_SelectBatchItem",
     "TUT_DelayPassThrough",
     "TUT_LoadExcel", "TUT_ReadExcelBatch", "TUT_ReadExcelMerged", "TUT_ReadExcelSingleLine",
@@ -134,7 +135,7 @@ class TUTNodesSmokeTests(unittest.TestCase):
                 "TUT_LUTLoaderPreview",
             }:
                 expected = IMAGE_COLOR
-            elif node_id in {"TUT_NodeHelp", "TUT_SplitTextBatch"}:
+            elif node_id in {"TUT_NodeHelp", "TUT_SplitTextBatch", "TUT_AnimaArtistPromptMixer"}:
                 expected = TOOLS_TEXT
             elif node_id in {
                 "TUT_LoadExcel", "TUT_ReadExcelBatch", "TUT_ReadExcelMerged",
